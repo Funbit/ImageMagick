@@ -3895,6 +3895,7 @@ static MagickBooleanType OpenPixelCache(Image *image,const MapMode mode,
   if (OpenPixelCacheOnDisk(cache_info,mode) == MagickFalse)
     {
       cache_info->type=UndefinedCache;
+      (void) ClosePixelCacheOnDisk(cache_info);
       ThrowFileException(exception,CacheError,"UnableToOpenPixelCache",
         image->filename);
       return(MagickFalse);
@@ -3904,6 +3905,7 @@ static MagickBooleanType OpenPixelCache(Image *image,const MapMode mode,
   if (status == MagickFalse)
     {
       cache_info->type=UndefinedCache;
+      (void) ClosePixelCacheOnDisk(cache_info);
       ThrowFileException(exception,CacheError,"UnableToExtendCache",
         image->filename);
       return(MagickFalse);
@@ -4473,6 +4475,7 @@ static MagickBooleanType ReadPixelCacheMetacontent(
       LockSemaphoreInfo(cache_info->file_semaphore);
       if (OpenPixelCacheOnDisk(cache_info,IOMode) == MagickFalse)
         {
+          (void)ClosePixelCacheOnDisk(cache_info);
           ThrowFileException(exception,FileOpenError,"UnableToOpenFile",
             cache_info->cache_filename);
           UnlockSemaphoreInfo(cache_info->file_semaphore);
@@ -4649,6 +4652,7 @@ static MagickBooleanType ReadPixelCachePixels(
       LockSemaphoreInfo(cache_info->file_semaphore);
       if (OpenPixelCacheOnDisk(cache_info,IOMode) == MagickFalse)
         {
+          (void)ClosePixelCacheOnDisk(cache_info);
           ThrowFileException(exception,FileOpenError,"UnableToOpenFile",
             cache_info->cache_filename);
           UnlockSemaphoreInfo(cache_info->file_semaphore);
@@ -5617,6 +5621,7 @@ static MagickBooleanType WritePixelCacheMetacontent(CacheInfo *cache_info,
       LockSemaphoreInfo(cache_info->file_semaphore);
       if (OpenPixelCacheOnDisk(cache_info,IOMode) == MagickFalse)
         {
+          (void) ClosePixelCacheOnDisk(cache_info);
           ThrowFileException(exception,FileOpenError,"UnableToOpenFile",
             cache_info->cache_filename);
           UnlockSemaphoreInfo(cache_info->file_semaphore);
@@ -5785,6 +5790,7 @@ static MagickBooleanType WritePixelCachePixels(
       LockSemaphoreInfo(cache_info->file_semaphore);
       if (OpenPixelCacheOnDisk(cache_info,IOMode) == MagickFalse)
         {
+          (void) ClosePixelCacheOnDisk(cache_info);
           ThrowFileException(exception,FileOpenError,"UnableToOpenFile",
             cache_info->cache_filename);
           UnlockSemaphoreInfo(cache_info->file_semaphore);
