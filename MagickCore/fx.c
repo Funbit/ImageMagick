@@ -703,6 +703,14 @@ static MagickBooleanType TranslateExpression
 
 static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe);
 
+static MagickBooleanType inline ChanIsVirtual (PixelChannel pc)
+{
+  if (pc==HUE_CHANNEL || pc==SAT_CHANNEL || pc==LIGHT_CHANNEL || pc==INTENSITY_CHANNEL)
+    return MagickTrue;
+
+  return MagickFalse;
+}
+
 static MagickBooleanType InitFx (FxInfo * pfx, const Image * img,
   MagickBooleanType CalcAllStats, ExceptionInfo *exception)
 {
@@ -1411,10 +1419,7 @@ static PixelChannel GetChannelQualifier (FxInfo * pfx, int op)
       if (LocaleCompare (pch->str, pfx->token)==0) {
 
         if (op >= FirstImgAttr && op <= (OperatorE)aNull &&
-              (pch->pixChan == HUE_CHANNEL ||
-               pch->pixChan == SAT_CHANNEL ||
-               pch->pixChan == LIGHT_CHANNEL ||
-               pch->pixChan == INTENSITY_CHANNEL)
+              ChanIsVirtual (pch->pixChan)
            )
         {
           (void) ThrowMagickException (
@@ -1984,6 +1989,26 @@ static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe)
           pfx->exception, GetMagickModule(), OptionError,
           "Can't have image attribute with HLS qualifier at", "'%s'",
           SetShortExp(pfx));
+        return MagickFalse;
+      }
+    }
+  }
+
+  if (iaQual != aNull && chQual != NO_CHAN_QUAL) {
+    if (ImgAttrs[iaQual-FirstImgAttr].NeedStats==0) {
+      (void) ThrowMagickException (
+        pfx->exception, GetMagickModule(), OptionError,
+        "Can't have image attribute ", "'%s' with channel qualifier '%s' at '%s'",
+        ImgAttrs[iaQual-FirstImgAttr].str,
+        pfx->token, SetShortExp(pfx));
+      return MagickFalse;
+    } else {
+      if (ChanIsVirtual (chQual)) {
+        (void) ThrowMagickException (
+          pfx->exception, GetMagickModule(), OptionError,
+          "Can't have statistical image attribute ", "'%s' with virtual channel qualifier '%s' at '%s'",
+          ImgAttrs[iaQual-FirstImgAttr].str,
+          pfx->token, SetShortExp(pfx));
         return MagickFalse;
       }
     }
@@ -2860,12 +2885,23 @@ static inline fxFltType ImageStat (
   fxFltType ret = 0;
   MagickBooleanType NeedRelinq = MagickFalse;
 
-  assert (channel >= 0 && channel <= MaxPixelChannels);
-
   if (pfx->GotStats) {
+    if ((channel < 0) || (channel > MaxPixelChannels))
+      {
+        (void) ThrowMagickException(pfx->exception,GetMagickModule(),
+          OptionError,"NoSuchImageChannel","%i",channel);
+        channel=0;
+      }
     cs = pfx->statistics[ImgNum];
   } else if (pfx->NeedStats) {
     /* If we need more than one statistic per pixel, this is inefficient. */
+    if ((channel < 0) || (channel > MaxPixelChannels))
+      {
+        (void) ThrowMagickException(pfx->exception,GetMagickModule(),
+          OptionError,"NoSuchImageChannel","%i",channel);
+        channel=0;
+      }
+    cs = pfx->statistics[ImgNum];
     cs = CollectOneImgStats (pfx, pfx->Images[ImgNum]);
     NeedRelinq = MagickTrue;
   }
@@ -2878,23 +2914,23 @@ static inline fxFltType ImageStat (
       ret = (fxFltType) GetBlobSize (pfx->image);
       break;
     case aKurtosis:
-      if (cs != (ChannelStatistics *) NULL)
+      if ((cs != (ChannelStatistics *) NULL) && (channel > 0))
         ret = cs[channel].kurtosis;
       break;
     case aMaxima:
-      if (cs != (ChannelStatistics *) NULL)
+      if ((cs != (ChannelStatistics *) NULL) && (channel > 0))
         ret = cs[channel].maxima;
       break;
     case aMean:
-      if (cs != (ChannelStatistics *) NULL)
+      if ((cs != (ChannelStatistics *) NULL) && (channel > 0))
         ret = cs[channel].mean;
       break;
     case aMedian:
-      if (cs != (ChannelStatistics *) NULL)
+      if ((cs != (ChannelStatistics *) NULL) && (channel > 0))
         ret = cs[channel].median;
       break;
     case aMinima:
-      if (cs != (ChannelStatistics *) NULL)
+      if ((cs != (ChannelStatistics *) NULL) && (channel > 0))
         ret = cs[channel].minima;
       break;
     case aPage:
@@ -2936,11 +2972,11 @@ static inline fxFltType ImageStat (
       ret = pfx->Images[ImgNum]->resolution.y;
       break;
     case aSkewness:
-      if (cs != (ChannelStatistics *) NULL)
+      if ((cs != (ChannelStatistics *) NULL) && (channel > 0))
         ret = cs[channel].skewness;
       break;
     case aStdDev:
-      if (cs != (ChannelStatistics *) NULL)
+      if ((cs != (ChannelStatistics *) NULL) && (channel > 0))
         ret = cs[channel].standard_deviation;
       break;
     case aH:
@@ -3715,6 +3751,7 @@ static MagickBooleanType ExecuteRPN (FxInfo * pfx, fxRtT * pfxrt, fxFltType *res
               break;
             } else if (pel->ChannelQual == INTENSITY_CHANNEL) {
               regA = GetIntensity (pfx, ImgNum, fx, fy);
+              break;
             }
           }
 
@@ -3745,23 +3782,23 @@ static MagickBooleanType ExecuteRPN (FxInfo * pfx, fxRtT * pfxrt, fxFltType *res
           regA = (fxFltType) img->extent;
           break;
         case aKurtosis:
-          if (cs != (ChannelStatistics *) NULL)
+          if ((cs != (ChannelStatistics *) NULL) && (channel > 0))
             regA = cs[WHICH_ATTR_CHAN].kurtosis;
           break;
         case aMaxima:
-          if (cs != (ChannelStatistics *) NULL)
+          if ((cs != (ChannelStatistics *) NULL) && (channel > 0))
             regA = cs[WHICH_ATTR_CHAN].maxima;
           break;
         case aMean:
-          if (cs != (ChannelStatistics *) NULL)
+          if ((cs != (ChannelStatistics *) NULL) && (channel > 0))
             regA = cs[WHICH_ATTR_CHAN].mean;
           break;
         case aMedian:
-          if (cs != (ChannelStatistics *) NULL)
+          if ((cs != (ChannelStatistics *) NULL) && (channel > 0))
             regA = cs[WHICH_ATTR_CHAN].median;
           break;
         case aMinima:
-          if (cs != (ChannelStatistics *) NULL)
+          if ((cs != (ChannelStatistics *) NULL) && (channel > 0))
             regA = cs[WHICH_ATTR_CHAN].minima;
           break;
         case aPage:
@@ -3798,11 +3835,11 @@ static MagickBooleanType ExecuteRPN (FxInfo * pfx, fxRtT * pfxrt, fxFltType *res
           regA = (fxFltType) img->resolution.y;
           break;
         case aSkewness:
-          if (cs != (ChannelStatistics *) NULL)
+          if ((cs != (ChannelStatistics *) NULL) && (channel > 0))
             regA = cs[WHICH_ATTR_CHAN].skewness;
           break;
         case aStdDev:
-          if (cs != (ChannelStatistics *) NULL)
+          if ((cs != (ChannelStatistics *) NULL) && (channel > 0))
             regA = cs[WHICH_ATTR_CHAN].standard_deviation;
           break;
         case aH: /* image->rows */

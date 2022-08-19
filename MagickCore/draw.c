@@ -89,6 +89,7 @@
 /*
   Define declarations.
 */
+#define AntialiasThreshold  (1.0/3.0)
 #define BezierQuantum  200
 #define PrimitiveExtentPad  4296.0
 #define MaxBezierCoordinates  67108864
@@ -325,6 +326,7 @@ MagickExport DrawInfo *CloneDrawInfo(const ImageInfo *image_info,
   clone_info->interline_spacing=draw_info->interline_spacing;
   clone_info->interword_spacing=draw_info->interword_spacing;
   clone_info->direction=draw_info->direction;
+  clone_info->word_break=draw_info->word_break;
   if (draw_info->density != (char *) NULL)
     (void) CloneString(&clone_info->density,draw_info->density);
   clone_info->align=draw_info->align;
@@ -3786,8 +3788,8 @@ static MagickBooleanType RenderMVGContent(Image *image,
             if (graphic_context[n]->clip_path != MagickFalse)
               break;
             factor=strchr(token,'%') != (char *) NULL ? 0.01 : 1.0;
-            opacity=1.0-MagickMin(MagickMax(factor*
-              GetDrawValue(token,&next_token),0.0),1.0);
+            opacity=MagickMin(MagickMax(factor*GetDrawValue(token,&next_token),
+              0.0),1.0);
             if (token == next_token)
               ThrowPointExpectedException(token,exception);
             if (graphic_context[n]->compliance == SVGCompliance)
@@ -5132,8 +5134,8 @@ static MagickBooleanType DrawPolygonPrimitive(Image *image,
         x,y,&stroke_alpha);
       if (draw_info->stroke_antialias == MagickFalse)
         {
-          fill_alpha=fill_alpha > 0.5 ? 1.0 : 0.0;
-          stroke_alpha=stroke_alpha > 0.5 ? 1.0 : 0.0;
+          fill_alpha=fill_alpha >= AntialiasThreshold ? 1.0 : 0.0;
+          stroke_alpha=stroke_alpha >= AntialiasThreshold ? 1.0 : 0.0;
         }
       GetFillColor(draw_info,x-poly_extent.x1,y-poly_extent.y1,&fill_color,
         exception);
@@ -6075,6 +6077,10 @@ MagickExport void GetDrawInfo(const ImageInfo *image_info,DrawInfo *draw_info)
         weight=(ssize_t) StringToUnsignedLong(option);
       draw_info->weight=(size_t) weight;
     }
+  option=GetImageOption(clone_info,"word-break");
+  if (option != (const char *) NULL)
+    draw_info->word_break=(WordBreakType) ParseCommandOption(
+      MagickWordBreakOptions,MagickFalse,option);
   exception=DestroyExceptionInfo(exception);
   draw_info->signature=MagickCoreSignature;
   clone_info=DestroyImageInfo(clone_info);
@@ -6535,13 +6541,6 @@ static MagickBooleanType TraceLine(PrimitiveInfo *primitive_info,
 {
   if (TracePoint(primitive_info,start) == MagickFalse)
     return(MagickFalse);
-  if ((fabs(start.x-end.x) < MagickEpsilon) &&
-      (fabs(start.y-end.y) < MagickEpsilon))
-    {
-      primitive_info->primitive=PointPrimitive;
-      primitive_info->coordinates=1;
-      return(MagickTrue);
-    }
   if (TracePoint(primitive_info+1,end) == MagickFalse)
     return(MagickFalse);
   (primitive_info+1)->primitive=primitive_info->primitive;

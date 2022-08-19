@@ -994,14 +994,10 @@ static MagickBooleanType WriteJP2Image(const ImageInfo *image_info,Image *image,
   for (i=0; i < (ssize_t) channels; i++)
   {
     jp2_info[i].prec=(OPJ_UINT32) image->depth;
-    jp2_info[i].bpp=(OPJ_UINT32) image->depth;
     if ((image->depth == 1) &&
         ((LocaleCompare(image_info->magick,"JPT") == 0) ||
          (LocaleCompare(image_info->magick,"JP2") == 0)))
-      {
-        jp2_info[i].prec++;  /* OpenJPEG returns exception for depth @ 1 */
-        jp2_info[i].bpp++;
-      }
+      jp2_info[i].prec++;  /* OpenJPEG returns exception for depth @ 1 */
     jp2_info[i].sgnd=0;
     jp2_info[i].dx=parameters->subsampling_dx;
     jp2_info[i].dy=parameters->subsampling_dy;
@@ -1027,8 +1023,8 @@ static MagickBooleanType WriteJP2Image(const ImageInfo *image_info,Image *image,
   if (channels == 4)
     jp2_image->comps[3].alpha=1;
   else
-   if ((channels == 2) && (jp2_colorspace == OPJ_CLRSPC_GRAY))
-     jp2_image->comps[1].alpha=1;
+    if ((channels == 2) && (jp2_colorspace == OPJ_CLRSPC_GRAY))
+      jp2_image->comps[1].alpha=1;
   /*
     Convert to JP2 pixels.
   */
