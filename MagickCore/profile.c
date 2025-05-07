@@ -69,20 +69,14 @@
 #include "MagickCore/token.h"
 #include "MagickCore/utility.h"
 #if defined(MAGICKCORE_LCMS_DELEGATE)
-#if defined(MAGICKCORE_HAVE_LCMS_LCMS2_H)
 #include <wchar.h>
+#if defined(MAGICKCORE_HAVE_LCMS_LCMS2_H)
 #include <lcms/lcms2.h>
 #else
-#include <wchar.h>
 #include "lcms2.h"
 #endif
 #endif
 #if defined(MAGICKCORE_XML_DELEGATE)
-#  if defined(MAGICKCORE_WINDOWS_SUPPORT)
-#    if !defined(__MINGW32__)
-#      include <win32config.h>
-#    endif
-#  endif
 #  include <libxml/parser.h>
 #  include <libxml/tree.h>
 #endif
@@ -91,7 +85,7 @@
   Forward declarations
 */
 static MagickBooleanType
-  SetImageProfileInternal(Image *,const char *,const StringInfo *,
+  SetImageProfileInternal(Image *,const char *,StringInfo *,
     const MagickBooleanType,ExceptionInfo *);
 
 static void
@@ -183,7 +177,7 @@ MagickExport MagickBooleanType CloneImageProfiles(Image *image,
 %
 %  The format of the DeleteImageProfile method is:
 %
-%      MagickBooleanTyupe DeleteImageProfile(Image *image,const char *name)
+%      MagickBooleanType DeleteImageProfile(Image *image,const char *name)
 %
 %  A description of each parameter follows:
 %
@@ -481,7 +475,7 @@ static cmsHTRANSFORM *AcquireTransformTLS(const LCMSInfo *source_info,
   {
     transform[i]=cmsCreateTransformTHR(cms_context,source_info->profile,
       source_info->type,target_info->profile,target_info->type,
-      target_info->intent,flags);
+      (cmsUInt32Number) target_info->intent,flags);
     if (transform[i] == (cmsHTRANSFORM) NULL)
       return(DestroyTransformTLS(transform));
   }
@@ -526,9 +520,11 @@ static void TransformDoublePixels(const int id,const Image* image,
   const cmsHTRANSFORM *transform,Quantum *q)
 {
 #define GetLCMSPixel(source_info,pixel,index) \
-  (source_info->scale[index]*((QuantumScale*pixel)+source_info->translate[index]))
-#define SetLCMSPixel(target_info,pixel,index) \
-  ClampToQuantum(target_info->scale[index]*((QuantumRange*pixel)+target_info->translate[index]))
+  (source_info->scale[index]*(((double) QuantumScale*(double) pixel)+ \
+  source_info->translate[index]))
+#define SetLCMSPixel(target_info,pixel,index) ClampToQuantum( \
+  target_info->scale[index]*(((double) QuantumRange*(double) pixel)+ \
+  target_info->translate[index]))
 
   double
     *p;
@@ -547,7 +543,7 @@ static void TransformDoublePixels(const int id,const Image* image,
       }
     if (source_info->channels > 3)
       *p++=GetLCMSPixel(source_info,GetPixelBlack(image,q),3);
-    q+=GetPixelChannels(image);
+    q+=(ptrdiff_t) GetPixelChannels(image);
   }
   cmsDoTransform(transform[id],source_info->pixels[id],target_info->pixels[id],
     (unsigned int) image->columns);
@@ -572,7 +568,7 @@ static void TransformDoublePixels(const int id,const Image* image,
         SetPixelBlack(image,SetLCMSPixel(target_info,*p,3),q);
         p++;
       }
-    q+=GetPixelChannels(image);
+    q+=(ptrdiff_t) GetPixelChannels(image);
   }
 }
 
@@ -597,7 +593,7 @@ static void TransformQuantumPixels(const int id,const Image* image,
       }
     if (source_info->channels > 3)
       *p++=GetPixelBlack(image,q);
-    q+=GetPixelChannels(image);
+    q+=(ptrdiff_t) GetPixelChannels(image);
   }
   cmsDoTransform(transform[id],source_info->pixels[id],target_info->pixels[id],
     (unsigned int) image->columns);
@@ -616,7 +612,7 @@ static void TransformQuantumPixels(const int id,const Image* image,
       }
     if (target_info->channels > 3)
       SetPixelBlack(image,*p++,q);
-    q+=GetPixelChannels(image);
+    q+=(ptrdiff_t) GetPixelChannels(image);
   }
 }
 
@@ -637,8 +633,7 @@ static inline void SetLCMSInfoScale(LCMSInfo *info,const double scale)
 }
 #endif
 
-static MagickBooleanType SetsRGBImageProfile(Image *image,
-  ExceptionInfo *exception)
+static void SetsRGBImageProfile(Image *image,ExceptionInfo *exception)
 {
   static unsigned char
     sRGBProfile[] =
@@ -916,18 +911,13 @@ static MagickBooleanType SetsRGBImageProfile(Image *image,
   StringInfo
     *profile;
 
-  MagickBooleanType
-    status;
-
   assert(image != (Image *) NULL);
   assert(image->signature == MagickCoreSignature);
   if (GetImageProfile(image,"icc") != (const StringInfo *) NULL)
-    return(MagickFalse);
-  profile=AcquireStringInfo(sizeof(sRGBProfile));
-  SetStringInfoDatum(profile,sRGBProfile);
-  status=SetImageProfile(image,"icc",profile,exception);
-  profile=DestroyStringInfo(profile);
-  return(status);
+    return;
+  profile=BlobToProfileStringInfo("icc",sRGBProfile,sizeof(sRGBProfile),
+    exception);
+  (void) SetImageProfilePrivate(image,profile,exception);
 }
 
 MagickExport MagickBooleanType ProfileImage(Image *image,const char *name,
@@ -985,10 +975,12 @@ MagickExport MagickBooleanType ProfileImage(Image *image,const char *name,
     Add a ICC, IPTC, or generic profile to the image.
   */
   status=MagickTrue;
-  profile=AcquireStringInfo((size_t) length);
+  profile=AcquireProfileStringInfo(name,(size_t) length,exception);
+  if (profile == (StringInfo *) NULL)
+    return(MagickFalse);
   SetStringInfoDatum(profile,(unsigned char *) datum);
   if ((LocaleCompare(name,"icc") != 0) && (LocaleCompare(name,"icm") != 0))
-    status=SetImageProfile(image,name,profile,exception);
+    status=SetImageProfilePrivate(image,profile,exception);
   else
     {
       const StringInfo
@@ -1004,10 +996,10 @@ MagickExport MagickBooleanType ProfileImage(Image *image,const char *name,
           value=GetImageProperty(image,"exif:ColorSpace",exception);
           (void) value;
           if (LocaleCompare(value,"1") != 0)
-            (void) SetsRGBImageProfile(image,exception);
+            SetsRGBImageProfile(image,exception);
           value=GetImageProperty(image,"exif:InteroperabilityIndex",exception);
           if (LocaleCompare(value,"R98.") != 0)
-            (void) SetsRGBImageProfile(image,exception);
+            SetsRGBImageProfile(image,exception);
           icc_profile=GetImageProfile(image,"icc");
         }
       if ((icc_profile != (const StringInfo *) NULL) &&
@@ -1057,7 +1049,7 @@ MagickExport MagickBooleanType ProfileImage(Image *image,const char *name,
           }
         if ((cmsGetDeviceClass(source_info.profile) != cmsSigLinkClass) &&
             (icc_profile == (StringInfo *) NULL))
-          status=SetImageProfile(image,name,profile,exception);
+          status=SetImageProfilePrivate(image,profile,exception);
         else
           {
             CacheView
@@ -1151,8 +1143,10 @@ MagickExport MagickBooleanType ProfileImage(Image *image,const char *name,
                     source_info.scale[0]=100.0;
                     source_info.scale[1]=255.0;
                     source_info.scale[2]=255.0;
+#if !defined(MAGICKCORE_HDRI_SUPPORT)
                     source_info.translate[1]=(-0.5);
                     source_info.translate[2]=(-0.5);
+#endif
                   }
 #if (MAGICKCORE_QUANTUM_DEPTH == 8)
                 else
@@ -1245,8 +1239,10 @@ MagickExport MagickBooleanType ProfileImage(Image *image,const char *name,
                     target_info.scale[0]=0.01;
                     target_info.scale[1]=1/255.0;
                     target_info.scale[2]=1/255.0;
+#if !defined(MAGICKCORE_HDRI_SUPPORT)
                     target_info.translate[1]=0.5;
                     target_info.translate[2]=0.5;
+#endif
                   }
 #if (MAGICKCORE_QUANTUM_DEPTH == 8)
                 else
@@ -1436,7 +1432,7 @@ MagickExport MagickBooleanType ProfileImage(Image *image,const char *name,
             transform=DestroyTransformTLS(transform);
             if ((status != MagickFalse) &&
                 (cmsGetDeviceClass(source_info.profile) != cmsSigLinkClass))
-              status=SetImageProfile(image,name,profile,exception);
+              status=SetImageProfilePrivate(image,profile,exception);
             if (target_info.profile != (cmsHPROFILE) NULL)
               (void) cmsCloseProfile(target_info.profile);
           }
@@ -1445,7 +1441,6 @@ MagickExport MagickBooleanType ProfileImage(Image *image,const char *name,
       }
 #endif
     }
-  profile=DestroyStringInfo(profile);
   return(status);
 }
 
@@ -1650,10 +1645,10 @@ static void WriteTo8BimProfile(Image *image,const char *name,
     q=p;
     if (LocaleNCompare((char *) p,"8BIM",4) != 0)
       break;
-    p+=4;
+    p+=(ptrdiff_t) 4;
     p=ReadResourceShort(p,&id);
     p=ReadResourceByte(p,&length_byte);
-    p+=length_byte;
+    p+=(ptrdiff_t) length_byte;
     if (((length_byte+1) & 0x01) != 0)
       p++;
     if (p > (datum+length-4))
@@ -1665,7 +1660,7 @@ static void WriteTo8BimProfile(Image *image,const char *name,
     if ((count < 0) || (p > (datum+length-count)) || (count > (ssize_t) length))
       break;
     if (id != profile_id)
-      p+=count;
+      p+=(ptrdiff_t) count;
     else
       {
         size_t
@@ -1679,20 +1674,21 @@ static void WriteTo8BimProfile(Image *image,const char *name,
           *extract_profile;
 
         extract_extent=0;
-        extent=(datum+length)-(p+count);
+        extent=(size_t) ((datum+length)-(p+count));
         if (profile == (StringInfo *) NULL)
           {
-            offset=(q-datum);
+            offset=(size_t) (q-datum);
             extract_profile=AcquireStringInfo(offset+extent);
             (void) memcpy(extract_profile->datum,datum,offset);
           }
         else
           {
-            offset=(p-datum);
-            extract_extent=profile->length;
+            offset=(size_t) (p-datum);
+            extract_extent=(ssize_t) profile->length;
             if ((extract_extent & 0x01) != 0)
               extract_extent++;
-            extract_profile=AcquireStringInfo(offset+extract_extent+extent);
+            extract_profile=AcquireStringInfo(offset+(size_t) extract_extent+
+              extent);
             (void) memcpy(extract_profile->datum,datum,offset-4);
             WriteResourceLong(extract_profile->datum+offset-4,(unsigned int)
               profile->length);
@@ -1742,17 +1738,18 @@ static void GetProfilesFromResourceBlock(Image *image,
   {
     if (LocaleNCompare((char *) p,"8BIM",4) != 0)
       break;
-    p+=4;
+    p+=(ptrdiff_t) 4;
     p=ReadResourceShort(p,&id);
     p=ReadResourceByte(p,&length_byte);
-    p+=length_byte;
+    p+=(ptrdiff_t) length_byte;
     if (((length_byte+1) & 0x01) != 0)
       p++;
     if (p > (datum+length-4))
       break;
     p=ReadResourceLong(p,&value);
     count=(ssize_t) value;
-    if ((p > (datum+length-count)) || (count > (ssize_t) length) || (count < 0))
+    if ((p > (datum+length-count)) || (count > (ssize_t) length) ||
+        (count <= 0))
       break;
     switch (id)
     {
@@ -1790,14 +1787,13 @@ static void GetProfilesFromResourceBlock(Image *image,
       case 0x0404:
       {
         /*
-          IPTC Profile
+          IPTC profile.
         */
-        profile=AcquireStringInfo(count);
-        SetStringInfoDatum(profile,p);
-        (void) SetImageProfileInternal(image,"iptc",profile,MagickTrue,
-          exception);
-        profile=DestroyStringInfo(profile);
-        p+=count;
+        profile=BlobToProfileStringInfo("iptc",p,(size_t) count,exception);
+        if (profile != (StringInfo *) NULL)
+          (void) SetImageProfileInternal(image,GetStringInfoName(profile),
+            profile,MagickTrue,exception);
+        p+=(ptrdiff_t) count;
         break;
       }
       case 0x040c:
@@ -1805,7 +1801,7 @@ static void GetProfilesFromResourceBlock(Image *image,
         /*
           Thumbnail.
         */
-        p+=count;
+        p+=(ptrdiff_t) count;
         break;
       }
       case 0x040f:
@@ -1813,12 +1809,11 @@ static void GetProfilesFromResourceBlock(Image *image,
         /*
           ICC Profile.
         */
-        profile=AcquireStringInfo(count);
-        SetStringInfoDatum(profile,p);
-        (void) SetImageProfileInternal(image,"icc",profile,MagickTrue,
-          exception);
-        profile=DestroyStringInfo(profile);
-        p+=count;
+        profile=BlobToProfileStringInfo("icc",p,(size_t) count,exception);
+        if (profile != (StringInfo *) NULL)
+          (void) SetImageProfileInternal(image,GetStringInfoName(profile),
+            profile,MagickTrue,exception);
+        p+=(ptrdiff_t) count;
         break;
       }
       case 0x0422:
@@ -1826,12 +1821,11 @@ static void GetProfilesFromResourceBlock(Image *image,
         /*
           EXIF Profile.
         */
-        profile=AcquireStringInfo(count);
-        SetStringInfoDatum(profile,p);
-        (void) SetImageProfileInternal(image,"exif",profile,MagickTrue,
-          exception);
-        profile=DestroyStringInfo(profile);
-        p+=count;
+        profile=BlobToProfileStringInfo("exif",p,(size_t) count,exception);
+        if (profile != (StringInfo *) NULL)
+          (void) SetImageProfileInternal(image,GetStringInfoName(profile),
+            profile,MagickTrue,exception);
+        p+=(ptrdiff_t) count;
         break;
       }
       case 0x0424:
@@ -1839,17 +1833,16 @@ static void GetProfilesFromResourceBlock(Image *image,
         /*
           XMP Profile.
         */
-        profile=AcquireStringInfo(count);
-        SetStringInfoDatum(profile,p);
-        (void) SetImageProfileInternal(image,"xmp",profile,MagickTrue,
-          exception);
-        profile=DestroyStringInfo(profile);
-        p+=count;
+        profile=BlobToProfileStringInfo("xmp",p,(size_t) count,exception);
+        if (profile != (StringInfo *) NULL)
+          (void) SetImageProfileInternal(image,GetStringInfoName(profile),
+            profile,MagickTrue,exception);
+        p+=(ptrdiff_t) count;
         break;
       }
       default:
       {
-        p+=count;
+        p+=(ptrdiff_t) count;
         break;
       }
     }
@@ -1878,8 +1871,8 @@ static void PatchCorruptProfile(const char *name,StringInfo *profile)
       p=(unsigned char *) strstr((const char *) p,"<?xpacket end=\"w\"?>");
       if (p != (unsigned char *) NULL)
         {
-          p+=19;
-          length=p-GetStringInfoDatum(profile);
+          p+=(ptrdiff_t) 19;
+          length=(size_t) (p-GetStringInfoDatum(profile));
           if (length != GetStringInfoLength(profile))
             {
               *p='\0';
@@ -1888,7 +1881,8 @@ static void PatchCorruptProfile(const char *name,StringInfo *profile)
         }
       return;
     }
-  if (LocaleCompare(name,"exif") == 0)
+  if (((LocaleCompare(name, "exif") == 0) || (LocaleCompare(name, "app1") == 0)) &&
+      (GetStringInfoLength(profile) > 2))
     {
       /*
         Check if profile starts with byte order marker instead of Exif.
@@ -1916,16 +1910,19 @@ static void PatchCorruptProfile(const char *name,StringInfo *profile)
     }
 }
 
-#if defined(MAGICKCORE_XML_DELEGATE)
 static MagickBooleanType ValidateXMPProfile(Image *image,
   const StringInfo *profile,ExceptionInfo *exception)
 {
+#if defined(MAGICKCORE_XML_DELEGATE)
   xmlDocPtr
     document;
 
   /*
-    Parse XML profile.
+    Validate XMP profile.
   */
+  const char *artifact=GetImageArtifact(image,"xmp:validate");
+  if (IsStringTrue(artifact) == MagickFalse)
+    return(MagickTrue);
   document=xmlReadMemory((const char *) GetStringInfoDatum(profile),(int)
     GetStringInfoLength(profile),"xmp.xml",NULL,XML_PARSE_NOERROR |
     XML_PARSE_NOWARNING);
@@ -1937,20 +1934,17 @@ static MagickBooleanType ValidateXMPProfile(Image *image,
     }
   xmlFreeDoc(document);
   return(MagickTrue);
-}
 #else
-static MagickBooleanType ValidateXMPProfile(Image *image,
-  const StringInfo *profile,ExceptionInfo *exception)
-{
+  (void) profile;
   (void) ThrowMagickException(exception,GetMagickModule(),
-    MissingDelegateWarning,"DelegateLibrarySupportNotBuiltIn","'%s' (XML)",
+    MissingDelegateWarning,"DelegateLibrarySupportNotBuiltIn","`%s' (XML)",
     image->filename);
   return(MagickFalse);
-}
 #endif
+}
 
 static MagickBooleanType SetImageProfileInternal(Image *image,const char *name,
-  const StringInfo *profile,const MagickBooleanType recursive,
+  StringInfo *profile,const MagickBooleanType recursive,
   ExceptionInfo *exception)
 {
   char
@@ -1959,43 +1953,111 @@ static MagickBooleanType SetImageProfileInternal(Image *image,const char *name,
   MagickBooleanType
     status;
 
-  StringInfo
-    *clone_profile;
+  size_t
+    length;
 
   assert(image != (Image *) NULL);
   assert(image->signature == MagickCoreSignature);
+  assert(profile != (StringInfo *) NULL);
+  assert(name != (const char *) NULL);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  clone_profile=CloneStringInfo(profile);
-  PatchCorruptProfile(name,clone_profile);
-  if ((LocaleCompare(name,"xmp") == 0) &&
-      (ValidateXMPProfile(image,clone_profile,exception) == MagickFalse))
+  length=GetStringInfoLength(profile);
+  if ((length == 0) || (length > GetMaxProfileSize()))
     {
-      clone_profile=DestroyStringInfo(clone_profile);
+      if (length != 0)
+        (void) ThrowMagickException(exception,GetMagickModule(),
+          ResourceLimitWarning,"ProfileSizeExceedsLimit","`%llu'",
+          (unsigned long long) length);
+      profile=DestroyStringInfo(profile);
+      return(MagickTrue);
+    }
+  PatchCorruptProfile(name,profile);
+  if ((LocaleCompare(name,"xmp") == 0) &&
+      (ValidateXMPProfile(image,profile,exception) == MagickFalse))
+    {
+      profile=DestroyStringInfo(profile);
       return(MagickTrue);
     }
   if (image->profiles == (SplayTreeInfo *) NULL)
     image->profiles=NewSplayTree(CompareSplayTreeString,RelinquishMagickMemory,
       DestroyProfile);
   (void) CopyMagickString(key,name,MagickPathExtent);
-  LocaleLower(key);
+  /*
+   * When an app1 profile starts with an exif header then store it as an exif
+   * profile instead. The PatchCorruptProfile method already ensures that the
+   * profile starts with exif instead of MM or II.
+   */
+  if ((length > 4) && (LocaleCompare(key,"app1") == 0) && 
+      (LocaleNCompare((const char *) GetStringInfoDatum(profile),"exif",4) == 0))
+    (void) CopyMagickString(key,"exif",MagickPathExtent);
+  else
+    LocaleLower(key);
   status=AddValueToSplayTree((SplayTreeInfo *) image->profiles,
-    ConstantString(key),clone_profile);
-  if (status != MagickFalse)
+    ConstantString(key),profile);
+  if (status == MagickFalse)
+    profile=DestroyStringInfo(profile);
+  else
     {
-      if (LocaleCompare(name,"8bim") == 0)
-        GetProfilesFromResourceBlock(image,clone_profile,exception);
+      if (LocaleCompare(key,"8bim") == 0)
+        GetProfilesFromResourceBlock(image,profile,exception);
       else
         if (recursive == MagickFalse)
-          WriteTo8BimProfile(image,name,clone_profile);
+          WriteTo8BimProfile(image,key,profile);
     }
   return(status);
+}
+
+MagickExport StringInfo *AcquireProfileStringInfo(const char *name,
+  const size_t length,ExceptionInfo *exception)
+{
+  StringInfo
+    *profile = (StringInfo *) NULL;
+
+  if (length > GetMaxProfileSize())
+    (void) ThrowMagickException(exception,GetMagickModule(),
+      ResourceLimitWarning,"ProfileSizeExceedsLimit","`%llu'",
+      (unsigned long long) length);
+  else
+    {
+      profile=AcquireStringInfo(length);
+      SetStringInfoName(profile,name);
+    }
+  return(profile);
+}
+
+MagickExport StringInfo *BlobToProfileStringInfo(const char *name,
+  const void *blob,const size_t length,ExceptionInfo *exception)
+{
+  StringInfo
+    *profile;
+
+  profile=AcquireProfileStringInfo(name,length,exception);
+  if (profile != (const StringInfo *) NULL)
+    (void) memcpy(profile->datum,blob,length);
+  return(profile);
 }
 
 MagickExport MagickBooleanType SetImageProfile(Image *image,const char *name,
   const StringInfo *profile,ExceptionInfo *exception)
 {
-  return(SetImageProfileInternal(image,name,profile,MagickFalse,exception));
+  StringInfo
+    *clone_profile;
+
+  if (profile == (const StringInfo *) NULL)
+    return(MagickFalse);
+  clone_profile=CloneStringInfo(profile);
+  return(SetImageProfileInternal(image,name,clone_profile,MagickFalse,
+    exception));
+}
+
+MagickExport MagickBooleanType SetImageProfilePrivate(Image *image,
+  StringInfo *profile,ExceptionInfo *exception)
+{
+  if (profile == (const StringInfo *) NULL)
+    return(MagickFalse);
+  return(SetImageProfileInternal(image,GetStringInfoName(profile),profile,
+    MagickFalse,exception));
 }
 
 /*
@@ -2010,11 +2072,10 @@ MagickExport MagickBooleanType SetImageProfile(Image *image,const char *name,
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  SyncImageProfiles() synchronizes image properties with the image profiles.
-%  Currently we only support updating the EXIF resolution and orientation.
 %
 %  The format of the SyncImageProfiles method is:
 %
-%      MagickBooleanType SyncImageProfiles(Image *image)
+%      void SyncImageProfiles(Image *image)
 %
 %  A description of each parameter follows:
 %
@@ -2161,7 +2222,7 @@ static void WriteProfileShort(const EndianType endian,
   (void) memcpy(p,buffer,2);
 }
 
-static MagickBooleanType SyncExifProfile(const Image *image,unsigned char *exif,
+static void SyncExifProfile(const Image *image,unsigned char *exif,
   size_t length)
 {
 #define MaxDirectoryStack  16
@@ -2180,7 +2241,7 @@ static MagickBooleanType SyncExifProfile(const Image *image,unsigned char *exif,
   } DirectoryInfo;
 
   DirectoryInfo
-    directory_stack[MaxDirectoryStack] = { 0 };
+    directory_stack[MaxDirectoryStack] = { { 0, 0 } };
 
   EndianType
     endian;
@@ -2204,7 +2265,7 @@ static MagickBooleanType SyncExifProfile(const Image *image,unsigned char *exif,
     *directory;
 
   if (length < 16)
-    return(MagickFalse);
+    return;
   id=(ssize_t) ReadProfileShort(LSBEndian,exif);
   if ((id != 0x4949) && (id != 0x4D4D))
     {
@@ -2225,7 +2286,7 @@ static MagickBooleanType SyncExifProfile(const Image *image,unsigned char *exif,
         break;
       }
       if (length < 16)
-        return(MagickFalse);
+        return;
       id=(ssize_t) ReadProfileShort(LSBEndian,exif);
     }
   endian=LSBEndian;
@@ -2235,15 +2296,15 @@ static MagickBooleanType SyncExifProfile(const Image *image,unsigned char *exif,
     if (id == 0x4D4D)
       endian=MSBEndian;
     else
-      return(MagickFalse);
+      return;
   if (ReadProfileShort(endian,exif+2) != 0x002a)
-    return(MagickFalse);
+    return;
   /*
     This the offset to the first IFD.
   */
   offset=(ssize_t) ReadProfileLong(endian,exif+4);
   if ((offset < 0) || ((size_t) offset >= length))
-    return(MagickFalse);
+    return;
   directory=exif+offset;
   level=0;
   entry=0;
@@ -2262,7 +2323,7 @@ static MagickBooleanType SyncExifProfile(const Image *image,unsigned char *exif,
     /*
       Determine how many entries there are in the current IFD.
     */
-    number_entries=ReadProfileShort(endian,directory);
+    number_entries=(size_t) ReadProfileShort(endian,directory);
     for ( ; entry < number_entries; entry++)
     {
       int
@@ -2292,7 +2353,7 @@ static MagickBooleanType SyncExifProfile(const Image *image,unsigned char *exif,
       components=(int) ReadProfileLong(endian,q+4);
       if (components < 0)
         break;  /* corrupt EXIF */
-      number_bytes=(size_t) components*format_bytes[format];
+      number_bytes=(size_t) components*(size_t) format_bytes[format];
       if ((ssize_t) number_bytes < components)
         break;  /* prevent overflow */
       if (number_bytes <= 4)
@@ -2303,7 +2364,8 @@ static MagickBooleanType SyncExifProfile(const Image *image,unsigned char *exif,
             The directory entry contains an offset.
           */
           offset=(ssize_t) ReadProfileLong(endian,q+8);
-          if ((offset < 0) || ((size_t) (offset+number_bytes) > length))
+          if ((offset < 0) ||
+              ((size_t) (offset+(ssize_t) number_bytes) > length))
             continue;
           if (~length < number_bytes)
             continue;  /* prevent overflow */
@@ -2378,11 +2440,10 @@ static MagickBooleanType SyncExifProfile(const Image *image,unsigned char *exif,
     }
   } while (level > 0);
   exif_resources=DestroySplayTree(exif_resources);
-  return(MagickTrue);
+  return;
 }
 
-static MagickBooleanType Sync8BimProfile(const Image *image,
-  const StringInfo *profile)
+static void Sync8BimProfile(const Image *image,const StringInfo *profile)
 {
   size_t
     length;
@@ -2409,18 +2470,18 @@ static MagickBooleanType Sync8BimProfile(const Image *image,
     if (ReadProfileByte(&p,&length) != 0x4D)
       continue;
     if (length < 7)
-      return(MagickFalse);
-    id=ReadProfileMSBShort(&p,&length);
+      return;
+    id=(unsigned short) ReadProfileMSBShort(&p,&length);
     count=(ssize_t) ReadProfileByte(&p,&length);
     if ((count >= (ssize_t) length) || (count < 0))
-      return(MagickFalse);
-    p+=count;
-    length-=count;
+      return;
+    p+=(ptrdiff_t) count;
+    length-=(size_t) count;
     if ((*p & 0x01) == 0)
       (void) ReadProfileByte(&p,&length);
     count=(ssize_t) ReadProfileMSBLong(&p,&length);
     if ((count > (ssize_t) length) || (count < 0))
-      return(MagickFalse);
+      return;
     if ((id == 0x3ED) && (count == 16))
       {
         if (image->units == PixelsPerCentimeterResolution)
@@ -2439,32 +2500,155 @@ static MagickBooleanType Sync8BimProfile(const Image *image,
         WriteProfileShort(MSBEndian,(unsigned short) image->units,p+12);
       }
     if (id == 0x0422)
-      (void) SyncExifProfile(image,p,count);
-    p+=count;
-    length-=count;
+      SyncExifProfile(image,p,(size_t) count);
+    p+=(ptrdiff_t) count;
+    length-=(size_t) count;
   }
+  return;
+}
+
+static void ReplaceXmpValue(StringInfo *profile,size_t start,size_t end,
+  const char *value)
+{
+  char
+    *datum;
+
+  size_t
+    length,
+    new_length,
+    value_length;
+
+  length=GetStringInfoLength(profile);
+  value_length=strlen(value);
+  new_length=length-(end-start)+value_length;
+  if (new_length > length)
+    SetStringInfoLength(profile,new_length);
+  datum=(char *) GetStringInfoDatum(profile);
+  (void) memmove(datum+start+value_length,datum+end,length-end);
+  (void) memcpy(datum+start,value,value_length);
+  if (new_length < length)
+    {
+      SetStringInfoLength(profile,new_length);
+      datum=(char *) GetStringInfoDatum(profile);
+      *(datum+new_length)='\0';
+    }
+}
+
+static MagickBooleanType GetXmpOffsets(const StringInfo *profile,
+  const char *tag,size_t *start,size_t *end)
+{
+  char
+    *datum,
+    *pos;
+
+  size_t
+    length,
+    tag_length;
+
+  datum=(char *) GetStringInfoDatum(profile);
+  length=GetStringInfoLength(profile);
+  pos=strstr(datum,tag);
+  tag_length=strlen(tag);
+  if ((pos == (char *) NULL) || ((pos-datum) < 1) || (*(pos-1) != '<') ||
+      (((size_t) (pos-datum)+tag_length) > length) ||
+      (*(pos+tag_length) != '>'))
+    return(MagickFalse);
+  *start=(size_t) (pos-datum)+tag_length+1;
+  pos=strstr(datum+*start,"<");
+  if (pos == (char *) NULL)
+    return(MagickFalse);
+  *end=(size_t) (pos-datum);
   return(MagickTrue);
 }
 
-MagickPrivate MagickBooleanType SyncImageProfiles(Image *image)
+static void GetXmpNumeratorAndDenominator(double value,
+  unsigned long *numerator,unsigned long *denominator)
 {
-  MagickBooleanType
-    status;
+  double
+    df;
 
+  *numerator=0;
+  *denominator=1;
+  if (value <= MagickEpsilon)
+    return;
+  *numerator=1;
+  df=1.0;
+  while(fabs(df - value) > MagickEpsilon)
+  {
+    if (df < value)
+      (*numerator)++;
+    else
+      {
+        (*denominator)++;
+        *numerator=(unsigned long) (value*(*denominator));
+      }
+    df=*numerator/(double)*denominator;
+  }
+}
+
+static void SyncXmpProfile(const Image *image,StringInfo *profile)
+{
+  char
+    value[MagickPathExtent];
+
+  size_t
+    end,
+    start;
+
+  unsigned long
+    denominator,
+    numerator;
+
+  *value='\0';
+  if (GetXmpOffsets(profile,"tiff:XResolution",&start,&end) != MagickFalse)
+    {
+      GetXmpNumeratorAndDenominator(image->resolution.x,&numerator,
+        &denominator);
+      (void) FormatLocaleString(value,MagickPathExtent,"%lu/%lu",numerator,
+        denominator);
+      ReplaceXmpValue(profile,start,end,value);
+    }
+  if (GetXmpOffsets(profile,"tiff:YResolution",&start,&end) != MagickFalse)
+    {
+      if ((fabs(image->resolution.x-image->resolution.y) > MagickEpsilon) ||
+          (*value == '\0'))
+        {
+          GetXmpNumeratorAndDenominator(image->resolution.y,&numerator,
+            &denominator);
+          (void) FormatLocaleString(value,MagickPathExtent,"%lu/%lu",
+            numerator,denominator);
+        }
+      ReplaceXmpValue(profile,start,end,value);
+    }
+  if (GetXmpOffsets(profile,"tiff:ResolutionUnit",&start,&end) != MagickFalse)
+    {
+      (void) FormatLocaleString(value,MagickPathExtent,"%d",
+        ((int) image->units)+1);
+      ReplaceXmpValue(profile,start,end,value);
+    }
+  if (GetXmpOffsets(profile,"tiff:Orientation",&start,&end) != MagickFalse)
+    {
+      (void) FormatLocaleString(value,MagickPathExtent,"%d",
+        (int) image->orientation);
+      ReplaceXmpValue(profile,start,end,value);
+    }
+}
+
+MagickPrivate void SyncImageProfiles(Image *image)
+{
   StringInfo
     *profile;
 
-  status=MagickTrue;
   profile=(StringInfo *) GetImageProfile(image,"8BIM");
   if (profile != (StringInfo *) NULL)
-    if (Sync8BimProfile(image,profile) == MagickFalse)
-      status=MagickFalse;
+    Sync8BimProfile(image,profile);
   profile=(StringInfo *) GetImageProfile(image,"EXIF");
   if (profile != (StringInfo *) NULL)
-    if (SyncExifProfile(image,GetStringInfoDatum(profile),
-      GetStringInfoLength(profile)) == MagickFalse)
-      status=MagickFalse;
-  return(status);
+    SyncExifProfile(image,GetStringInfoDatum(profile),GetStringInfoLength(
+      profile));
+  profile=(StringInfo *) GetImageProfile(image,"XMP");
+  if (profile != (StringInfo *) NULL)
+    SyncXmpProfile(image,profile);
 }
 
 static void UpdateClipPath(unsigned char *blob,size_t length,
@@ -2472,9 +2656,7 @@ static void UpdateClipPath(unsigned char *blob,size_t length,
   const RectangleInfo *new_geometry)
 {
   ssize_t
-    i;
-
-  ssize_t
+    i,
     knot_count,
     selector;
 
@@ -2490,7 +2672,7 @@ static void UpdateClipPath(unsigned char *blob,size_t length,
         if (knot_count != 0)
           {
             blob+=24;
-            length-=MagickMin(24,(ssize_t) length);
+            length-=(size_t) MagickMin(length,24U);
             break;
           }
         /*
@@ -2498,7 +2680,7 @@ static void UpdateClipPath(unsigned char *blob,size_t length,
         */
         knot_count=(ssize_t) ReadProfileMSBShort(&blob,&length);
         blob+=22;
-        length-=MagickMin(22,(ssize_t) length);
+        length-=(size_t) MagickMin(length,22);
         break;
       }
       case 1:
@@ -2512,7 +2694,7 @@ static void UpdateClipPath(unsigned char *blob,size_t length,
               Unexpected subpath knot.
             */
             blob+=24;
-            length-=MagickMin(24,(ssize_t) length);
+            length-=(size_t) MagickMin(length,24);
             break;
           }
         /*
@@ -2548,7 +2730,7 @@ static void UpdateClipPath(unsigned char *blob,size_t length,
       default:
       {
         blob+=24;
-        length-=MagickMin(24,(ssize_t) length);
+        length-=(size_t) MagickMin(length,24);
         break;
       }
     }
@@ -2594,7 +2776,7 @@ MagickPrivate void Update8BIMClipPath(const Image *image,
     if ((count != 0) && ((size_t) count <= length))
       {
         info+=count;
-        length-=count;
+        length-=(size_t) count;
       }
     if ((count & 0x01) == 0)
       (void) ReadProfileByte(&info,&length);
@@ -2607,6 +2789,6 @@ MagickPrivate void Update8BIMClipPath(const Image *image,
     if ((id > 1999) && (id < 2999))
       UpdateClipPath(info,(size_t) count,old_columns,old_rows,new_geometry);
     info+=count;
-    length-=MagickMin(count,(ssize_t) length);
+    length-=(size_t) MagickMin(length,(size_t) count);
   }
 }

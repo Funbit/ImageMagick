@@ -17,7 +17,7 @@
 %                                 May 2001                                    %
 %                                                                             %
 %                                                                             %
-%  Copyright @ 2001 ImageMagick Studio LLC, a non-profit organization         %
+%  Copyright @ 1999 ImageMagick Studio LLC, a non-profit organization         %
 %  dedicated to making software imaging solutions freely available.           %
 %                                                                             %
 %  You may not use this file except in compliance with the License.  You may  %
@@ -177,8 +177,8 @@ static SplayTreeInfo *AcquireCoderCache(ExceptionInfo *exception)
     coder_info->name=(char *) p->name;
     coder_info->exempt=MagickTrue;
     coder_info->signature=MagickCoreSignature;
-    status&=AddValueToSplayTree(cache,ConstantString(coder_info->magick),
-      coder_info);
+    status&=(MagickStatusType) AddValueToSplayTree(cache,
+      ConstantString(coder_info->magick),coder_info);
     if (status == MagickFalse)
       (void) ThrowMagickException(exception,GetMagickModule(),
         ResourceLimitError,"MemoryAllocationFailed","`%s'",coder_info->name);

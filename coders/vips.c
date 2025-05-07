@@ -17,7 +17,7 @@
 %                                 April 2014                                  %
 %                                                                             %
 %                                                                             %
-%  Copyright @ 2014 ImageMagick Studio LLC, a non-profit organization         %
+%  Copyright @ 1999 ImageMagick Studio LLC, a non-profit organization         %
 %  dedicated to making software imaging solutions freely available.           %
 %                                                                             %
 %  You may not use this file except in compliance with the License.  You may  %
@@ -64,7 +64,7 @@
 #include "coders/coders-private.h"
 
 /*
-  Define declaractions.
+  Define declarations.
 */
 #define VIPS_MAGIC_LSB 0x08f2a6b6U
 #define VIPS_MAGIC_MSB 0xb6a6f208U
@@ -173,7 +173,7 @@ static MagickBooleanType IsVIPS(const unsigned char *magick,const size_t length)
 %
 %  The format of the ReadVIPSImage method is:
 %
-%      Image *ReadVIPSmage(const ImageInfo *image_info,ExceptionInfo *exception)
+%      Image *ReadVIPSImage(const ImageInfo *image_info,ExceptionInfo *exception)
 %
 %  A description of each parameter follows:
 %
@@ -291,7 +291,8 @@ static inline Quantum ReadVIPSPixelNONE(Image *image,
         case VIPSBandFormatINT:
           return(ScaleLongToQuantum(ReadBlobLong(image)));
         case VIPSBandFormatFLOAT:
-          return((Quantum) ((float) QuantumRange*(ReadBlobFloat(image)/1.0)));
+          return((Quantum) ((double) QuantumRange*((double)
+            ReadBlobFloat(image)/1.0)));
         case VIPSBandFormatDOUBLE:
           return((Quantum) ((double) QuantumRange*(ReadBlobDouble(
             image)/1.0)));
@@ -353,7 +354,7 @@ static MagickBooleanType ReadVIPSPixelsNONE(Image *image,
                 SetPixelAlpha(image,ReadVIPSPixelNONE(image,format,type),q);
               }
         }
-      q+=GetPixelChannels(image);
+      q+=(ptrdiff_t) GetPixelChannels(image);
     }
     if (SyncAuthenticPixels(image,exception) == MagickFalse)
       return(MagickFalse);
@@ -518,7 +519,8 @@ static Image *ReadVIPSImage(const ImageInfo *image_info,
       SetImageProperty(image,"vips:metadata",metadata,exception);
       metadata=(char *) RelinquishMagickMemory(metadata);
     }
-  (void) CloseBlob(image);
+  if (CloseBlob(image) == MagickFalse)
+    status=MagickFalse;
   if (status == MagickFalse)
     return((Image *) NULL);
   return(image);
@@ -535,7 +537,7 @@ static Image *ReadVIPSImage(const ImageInfo *image_info,
 %                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
-%  RegisterVIPSmage() adds attributes for the VIPS image format to the list
+%  RegisterVIPSImage() adds attributes for the VIPS image format to the list
 %  of supported formats.  The attributes include the image format tag, a
 %  method to read and/or write the format, whether the format supports the
 %  saving of more than one frame to the same file or blob, whether the format
@@ -757,12 +759,13 @@ static MagickBooleanType WriteVIPSImage(const ImageInfo *image_info,
                 WriteVIPSPixel(image,GetPixelAlpha(image,p));
               }
         }
-      p+=GetPixelChannels(image);
+      p+=(ptrdiff_t) GetPixelChannels(image);
     }
   }
   metadata=GetImageProperty(image,"vips:metadata",exception);
   if (metadata != (const char*) NULL)
     WriteBlobString(image,metadata);
-  (void) CloseBlob(image);
+  if (CloseBlob(image) == MagickFalse)
+    status=MagickFalse;
   return(status);
 }

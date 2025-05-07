@@ -438,8 +438,8 @@ static void Upsample(const size_t width,const size_t height,
   assert(pixels != (unsigned char *) NULL);
   for (y=0; y < (ssize_t) height; y++)
   {
-    p=pixels+(height-1-y)*scaled_width+(width-1);
-    q=pixels+((height-1-y) << 1)*scaled_width+((width-1) << 1);
+    p=pixels+(height-1-(size_t) y)*scaled_width+(width-1);
+    q=pixels+((height-1-(size_t) y) << 1)*scaled_width+((width-1) << 1);
     *q=(*p);
     *(q+1)=(*(p));
     for (x=1; x < (ssize_t) width; x++)
@@ -460,9 +460,9 @@ static void Upsample(const size_t width,const size_t height,
       *q=(unsigned char) ((((size_t) *p)+((size_t) *r)+1) >> 1);
       *(q+1)=(unsigned char) ((((size_t) *p)+((size_t) *(p+2))+
         ((size_t) *r)+((size_t) *(r+2))+2) >> 2);
-      q+=2;
-      p+=2;
-      r+=2;
+      q+=(ptrdiff_t) 2;
+      p+=(ptrdiff_t) 2;
+      r+=(ptrdiff_t) 2;
     }
     *q++=(unsigned char) ((((size_t) *p++)+((size_t) *r++)+1) >> 1);
     *q++=(unsigned char) ((((size_t) *p++)+((size_t) *r++)+1) >> 1);
@@ -693,7 +693,7 @@ static Image *ReadPCDImage(const ImageInfo *image_info,ExceptionInfo *exception)
             SetPixelRed(image,ScaleCharToQuantum(*yy++),q);
             SetPixelGreen(image,ScaleCharToQuantum(*c1++),q);
             SetPixelBlue(image,ScaleCharToQuantum(*c2++),q);
-            q+=GetPixelChannels(image);
+            q+=(ptrdiff_t) GetPixelChannels(image);
           }
           if (SyncAuthenticPixels(image,exception) == MagickFalse)
             break;
@@ -803,7 +803,7 @@ static Image *ReadPCDImage(const ImageInfo *image_info,ExceptionInfo *exception)
       SetPixelRed(image,ScaleCharToQuantum(*yy++),q);
       SetPixelGreen(image,ScaleCharToQuantum(*c1++),q);
       SetPixelBlue(image,ScaleCharToQuantum(*c2++),q);
-      q+=GetPixelChannels(image);
+      q+=(ptrdiff_t) GetPixelChannels(image);
     }
     if (SyncAuthenticPixels(image,exception) == MagickFalse)
       break;
@@ -995,9 +995,9 @@ static MagickBooleanType WritePCDTile(Image *image,const char *page_geometry,
   (void) ParseMetaGeometry(page_geometry,&geometry.x,&geometry.y,
     &geometry.width,&geometry.height);
   if ((geometry.width % 2) != 0)
-    geometry.width--;
+    geometry.width=MagickMax(geometry.width-1,1);
   if ((geometry.height % 2) != 0)
-    geometry.height--;
+    geometry.height=MagickMax(geometry.height-1,1);
   tile_image=ResizeImage(image,geometry.width,geometry.height,TriangleFilter,
     exception);
   if (tile_image == (Image *) NULL)
@@ -1057,7 +1057,7 @@ static MagickBooleanType WritePCDTile(Image *image,const char *page_geometry,
     for (x=0; x < (ssize_t) (tile_image->columns << 1); x++)
     {
       (void) WriteBlobByte(image,ScaleQuantumToChar(GetPixelRed(tile_image,p)));
-      p+=GetPixelChannels(tile_image);
+      p+=(ptrdiff_t) GetPixelChannels(tile_image);
     }
     q=GetVirtualPixels(downsample_image,0,y >> 1,downsample_image->columns,1,
       exception);
@@ -1067,7 +1067,7 @@ static MagickBooleanType WritePCDTile(Image *image,const char *page_geometry,
     {
       (void) WriteBlobByte(image,ScaleQuantumToChar(
         GetPixelGreen(tile_image,q)));
-      q+=GetPixelChannels(tile_image);
+      q+=(ptrdiff_t) GetPixelChannels(tile_image);
     }
     q=GetVirtualPixels(downsample_image,0,y >> 1,downsample_image->columns,1,
       exception);
@@ -1077,7 +1077,7 @@ static MagickBooleanType WritePCDTile(Image *image,const char *page_geometry,
     {
       (void) WriteBlobByte(image,ScaleQuantumToChar(
         GetPixelBlue(tile_image,q)));
-      q+=GetPixelChannels(tile_image);
+      q+=(ptrdiff_t) GetPixelChannels(tile_image);
     }
     status=SetImageProgress(image,SaveImageTag,(MagickOffsetType) y,
       tile_image->rows);

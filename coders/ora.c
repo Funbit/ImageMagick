@@ -20,7 +20,7 @@
 %                                August 2020                                  %
 %                                                                             %
 %                                                                             %
-%  Copyright @ 2020 ImageMagick Studio LLC, a non-profit organization         %
+%  Copyright @ 1999 ImageMagick Studio LLC, a non-profit organization         %
 %  dedicated to making software imaging solutions freely available.           %
 %                                                                             %
 %  You may not use this file except in compliance with the License.  You may  %
@@ -111,7 +111,7 @@ static Image *ReadORAImage(const ImageInfo *image_info,
   const char
     *MERGED_IMAGE_PATH = "mergedimage.png";
 
-   FILE
+  FILE
     *file;
 
   Image
@@ -198,20 +198,20 @@ static Image *ReadORAImage(const ImageInfo *image_info,
     else if (read_bytes == 0)
       {
         /* Write up to offset of image_data_buffer to temp file */
-        if (!fwrite(image_data_buffer,offset,1,file))
+        if (!fwrite(image_data_buffer,1,offset,file))
           status=MagickFalse;
         break;
       }
     else if (read_bytes == (ssize_t) (sizeof(image_data_buffer)-offset))
       {
         /* Write the entirely of image_data_buffer to temp file */
-        if (!fwrite(image_data_buffer,sizeof(image_data_buffer),1,file))
+        if (!fwrite(image_data_buffer,1,sizeof(image_data_buffer),file))
           status=MagickFalse;
         else
           offset=0;
       }
     else
-      offset+=read_bytes;
+      offset+=(zip_uint64_t) read_bytes;
   }
   (void) fclose(file);
   (void) zip_fclose(merged_image_file);
@@ -239,7 +239,7 @@ static Image *ReadORAImage(const ImageInfo *image_info,
       out_image->timestamp=time(&stat_info.st_mtime);
       (void) CopyMagickString(out_image->magick,image_metadata->magick,
         MagickPathExtent);
-      out_image->extent=stat_info.st_size;
+      out_image->extent=(MagickSizeType) stat_info.st_size;
     }
   image_metadata=DestroyImage(image_metadata);
   return(out_image);

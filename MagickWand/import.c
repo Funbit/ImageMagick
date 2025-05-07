@@ -197,10 +197,10 @@ static MagickBooleanType ImportUsage(void)
   return(MagickTrue);
 }
 
+#if defined(MAGICKCORE_X11_DELEGATE)
 WandExport MagickBooleanType ImportImageCommand(ImageInfo *image_info,
   int argc,char **argv,char **wand_unused(metadata),ExceptionInfo *exception)
 {
-#if defined(MAGICKCORE_X11_DELEGATE)
 #define DestroyImport() \
 { \
   XDestroyResourceInfo(&resource_info); \
@@ -250,7 +250,7 @@ WandExport MagickBooleanType ImportImageCommand(ImageInfo *image_info,
   MagickBooleanType
     fire,
     pend,
-    respect_parenthesis;
+    respect_parentheses;
 
   MagickStatusType
     status;
@@ -281,6 +281,7 @@ WandExport MagickBooleanType ImportImageCommand(ImageInfo *image_info,
   assert(image_info != (ImageInfo *) NULL);
   assert(image_info->signature == MagickCoreSignature);
   assert(exception != (ExceptionInfo *) NULL);
+  wand_unreferenced(metadata);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
   if (argc == 2)
@@ -300,7 +301,7 @@ WandExport MagickBooleanType ImportImageCommand(ImageInfo *image_info,
   option=(char *) NULL;
   pend=MagickFalse;
   resource_database=(XrmDatabase) NULL;
-  respect_parenthesis=MagickFalse;
+  respect_parentheses=MagickFalse;
   (void) memset(&resource_info,0,sizeof(resource_info));
   server_name=(char *) NULL;
   status=MagickTrue;
@@ -447,7 +448,7 @@ WandExport MagickBooleanType ImportImageCommand(ImageInfo *image_info,
         {
           MagickDelay(1000*resource_info.pause);
           images=XImportImage(image_info,&ximage_info,exception);
-          status&=(images != (Image *) NULL) &&
+          status&=(MagickStatusType) (images != (Image *) NULL) &&
             (exception->severity < ErrorException);
           if (images == (Image *) NULL)
             continue;
@@ -1094,7 +1095,7 @@ WandExport MagickBooleanType ImportImageCommand(ImageInfo *image_info,
           }
         if (LocaleNCompare("respect-parentheses",option+1,17) == 0)
           {
-            respect_parenthesis=(*option == '-') ? MagickTrue : MagickFalse;
+            respect_parentheses=(*option == '-') ? MagickTrue : MagickFalse;
             break;
           }
         if (LocaleCompare("rotate",option+1) == 0)
@@ -1287,10 +1288,14 @@ WandExport MagickBooleanType ImportImageCommand(ImageInfo *image_info,
   if (image == (Image *) NULL)
     ThrowImportException(OptionError,"MissingAnImageFilename",argv[argc-1]);
   FinalizeImageSettings(image_info,image,MagickTrue);
-  status&=WriteImages(image_info,image,filename,exception);
+  status&=(MagickStatusType) WriteImages(image_info,image,filename,exception);
   DestroyImport();
   return(status != 0 ? MagickTrue : MagickFalse);
 #else
+WandExport MagickBooleanType ImportImageCommand(ImageInfo *image_info,
+  int wand_unused(argc),char **wand_unused(argv),char **wand_unused(metadata),
+  ExceptionInfo *exception)
+{
   wand_unreferenced(argc);
   wand_unreferenced(argv);
   wand_unreferenced(metadata);

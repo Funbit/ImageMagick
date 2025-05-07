@@ -10,7 +10,7 @@
 %     CCCC   OOO   N   N  SSSSS    T    IIIII    T     UUU     T    EEEEE     %
 %                                                                             %
 %                                                                             %
-%                  MagickCore Methods to Consitute an Image                   %
+%                  MagickCore Methods to Constitute an Image                  %
 %                                                                             %
 %                             Software Design                                 %
 %                                  Cristy                                     %
@@ -83,7 +83,12 @@
 #include "MagickCore/utility-private.h"
 
 /*
-  Typedef declaractions.
+  Define declarations.
+*/
+#define MaxReadRecursionDepth  100
+
+/*
+  Typedef declarations.
 */
 typedef struct _ConstituteInfo
 {
@@ -578,12 +583,12 @@ static void SyncResolutionFromProperties(Image *image,
       if (strchr(resolution_y,',') != (char *) NULL)
         image->resolution.y=geometry_info.rho+geometry_info.sigma/1000.0;
       if (resolution_units != (char *) NULL)
-          {
-            option_type=ParseCommandOption(MagickResolutionOptions,MagickFalse,
-              resolution_units);
-            if (option_type >= 0)
-              image->units=(ResolutionType) option_type;
-          }
+        {
+          option_type=ParseCommandOption(MagickResolutionOptions,MagickFalse,
+            resolution_units);
+          if (option_type >= 0)
+            image->units=(ResolutionType) option_type;
+        }
       if (used_tiff == MagickFalse)
         {
           (void) DeleteImageProperty(image,"exif:XResolution");
@@ -819,10 +824,13 @@ MagickExport Image *ReadImage(const ImageInfo *image_info,
         *clones;
 
       clones=CloneImages(image,read_info->scenes,exception);
+      image=DestroyImageList(image);
       if (clones != (Image *) NULL)
+        image=GetFirstImageInList(clones);
+      if (image == (Image *) NULL)
         {
-          image=DestroyImageList(image);
-          image=GetFirstImageInList(clones);
+          read_info=DestroyImageInfo(read_info);
+          return(image);
         }
     }
   InitializeConstituteInfo(read_info,&constitute_info);
@@ -839,7 +847,7 @@ MagickExport Image *ReadImage(const ImageInfo *image_info,
       *source_date_epoch = (const char *) NULL;
 
     static MagickBooleanType
-      epoch_initalized = MagickFalse;
+      epoch_initialized = MagickFalse;
 
     next->taint=MagickFalse;
     GetPathComponent(magick_filename,MagickPath,magick_path);
@@ -912,15 +920,15 @@ MagickExport Image *ReadImage(const ImageInfo *image_info,
             else
               if (((flags & WidthValue) != 0) || ((flags & HeightValue) != 0))
                 {
-                  Image
-                    *size_image;
-
                   flags=ParseRegionGeometry(next,read_info->extract,&geometry,
                     exception);
-                  size_image=ResizeImage(next,geometry.width,geometry.height,
-                    next->filter,exception);
-                  if (size_image != (Image *) NULL)
-                    ReplaceImageInList(&next,size_image);
+                  if ((geometry.width != 0) && (geometry.height != 0))
+                    {
+                      Image *resize_image = ResizeImage(next,geometry.width,
+                        geometry.height,next->filter,exception);
+                      if (resize_image != (Image *) NULL)
+                        ReplaceImageInList(&next,resize_image);
+                    }
                 }
           }
       }
@@ -930,10 +938,10 @@ MagickExport Image *ReadImage(const ImageInfo *image_info,
     profile=GetImageProfile(next,"iptc");
     if (profile == (const StringInfo *) NULL)
       profile=GetImageProfile(next,"8bim");
-    if (epoch_initalized == MagickFalse)
+    if (epoch_initialized == MagickFalse)
       {
         source_date_epoch=getenv("SOURCE_DATE_EPOCH");
-        epoch_initalized=MagickTrue;
+        epoch_initialized=MagickTrue;
       }
     if (source_date_epoch == (const char *) NULL)
       {
@@ -1162,8 +1170,8 @@ MagickExport Image *ReadInlineImage(const ImageInfo *image_info,
         Extract media type.
       */
       if (LocaleNCompare(++p,"x-",2) == 0)
-        p+=2;
-      (void) strcpy(read_info->filename,"data.");
+        p+=(ptrdiff_t) 2;
+      (void) CopyMagickString(read_info->filename,"data.",MagickPathExtent);
       q=read_info->filename+5;
       for (i=0; (*p != ';') && (*p != '\0') && (i < (MagickPathExtent-6)); i++)
         *q++=(*p++);
@@ -1277,7 +1285,7 @@ MagickExport MagickBooleanType WriteImage(const ImageInfo *image_info,
             image->endian=(*(char *) &lsb_first) == 1 ? LSBEndian : MSBEndian;
          }
     }
-  (void) SyncImageProfiles(image);
+  SyncImageProfiles(image);
   DisassociateImageStream(image);
   option=GetImageOption(image_info,"delegate:bimodal");
   if ((IsStringTrue(option) != MagickFalse) &&
@@ -1327,7 +1335,8 @@ MagickExport MagickBooleanType WriteImage(const ImageInfo *image_info,
               (void) AcquireUniqueFilename(image->filename);
               temporary=MagickTrue;
             }
-          (void) CloseBlob(image);
+          if (CloseBlob(image) == MagickFalse)
+            status=MagickFalse;
         }
     }
   encoder=GetImageEncoder(magick_info);
@@ -1391,6 +1400,9 @@ MagickExport MagickBooleanType WriteImage(const ImageInfo *image_info,
               (void) CopyMagickString(image->filename,filename,
                 MagickPathExtent);
               encoder=GetImageEncoder(magick_info);
+              (void) ThrowMagickException(exception,GetMagickModule(),
+                MissingDelegateWarning,"NoEncodeDelegateForThisImageFormat",
+                "`%s'",write_info->magick);
             }
           if (encoder == (EncodeImageHandler *) NULL)
             {
@@ -1428,7 +1440,8 @@ MagickExport MagickBooleanType WriteImage(const ImageInfo *image_info,
           (void) RelinquishUniqueFileResource(write_info->filename);
           status=ImageToFile(image,write_info->filename,exception);
         }
-      (void) CloseBlob(image);
+      if (CloseBlob(image) == MagickFalse)
+        status=MagickFalse;
       (void) RelinquishUniqueFileResource(image->filename);
       (void) CopyMagickString(image->filename,write_info->filename,
         MagickPathExtent);
@@ -1533,13 +1546,7 @@ MagickExport MagickBooleanType WriteImages(const ImageInfo *image_info,
   p=images;
   for ( ; GetNextImageInList(p) != (Image *) NULL; p=GetNextImageInList(p))
   {
-    Image
-      *next;
-
-    next=GetNextImageInList(p);
-    if (next == (Image *) NULL)
-      break;
-    if (p->scene >= next->scene)
+    if (p->scene >= GetNextImageInList(p)->scene)
       {
         ssize_t
           i;
@@ -1565,7 +1572,7 @@ MagickExport MagickBooleanType WriteImages(const ImageInfo *image_info,
     if (number_images != 1)
       progress_monitor=SetImageProgressMonitor(p,(MagickProgressMonitor) NULL,
         p->client_data);
-    status&=WriteImage(write_info,p,exception);
+    status&=(MagickStatusType) WriteImage(write_info,p,exception);
     if (number_images != 1)
       (void) SetImageProgressMonitor(p,progress_monitor,p->client_data);
     if (write_info->adjoin != MagickFalse)

@@ -59,6 +59,7 @@
 #include "MagickCore/fx-private.h"
 #include "MagickCore/image-private.h"
 #include "MagickCore/linked-list.h"
+#include "MagickCore/linked-list-private.h"
 #include "MagickCore/list.h"
 #include "MagickCore/memory_.h"
 #include "MagickCore/memory-private.h"
@@ -89,6 +90,11 @@
   #define system(s) ((s)==NULL ? 0 : -1)
 #endif
 #define DelegateFilename  "delegates.xml"
+#if defined(MAGICKCORE_WINDOWS_SUPPORT)
+  #define DELEGATE_ESC "&quot;"
+#else
+  #define DELEGATE_ESC "&apos;"
+#endif
 
 /*
   Declare delegate map.
@@ -97,68 +103,74 @@ static const char
   *DelegateMap = (const char *)
     "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
     "<delegatemap>"
-    "  <delegate decode=\"bpg\" command=\"&quot;bpgdec&quot; -b 16 -o &quot;%o.png&quot; &quot;%i&quot;; mv &quot;%o.png&quot; &quot;%o&quot;\"/>"
-    "  <delegate decode=\"png\" encode=\"bpg\" command=\"&quot;bpgenc&quot; -b 12 -q %~ -o &quot;%o&quot; &quot;%i&quot;\"/>"
-    "  <delegate decode=\"browse\" stealth=\"True\" spawn=\"True\" command=\"&quot;xdg-open&quot; https://imagemagick.org/; rm &quot;%i&quot;\"/>"
-    "  <delegate decode=\"cdr\" command=\"&quot;uniconvertor&quot; &quot;%i&quot; &quot;%o.svg&quot;; mv &quot;%o.svg&quot; &quot;%o&quot;\"/>"
-    "  <delegate decode=\"cgm\" command=\"&quot;uniconvertor&quot; &quot;%i&quot; &quot;%o.svg&quot;; mv &quot;%o.svg&quot; &quot;%o&quot;\"/>"
-    "  <delegate decode=\"https\" command=\"&quot;curl&quot; -s -k -L -o &quot;%o&quot; &quot;https:%M&quot;\"/>"
-    "  <delegate decode=\"doc\" command=\"&quot;soffice&quot; --convert-to pdf -outdir `dirname &quot;%i&quot;` &quot;%i&quot; 2&gt; &quot;%u&quot;; mv &quot;%i.pdf&quot; &quot;%o&quot;\"/>"
-    "  <delegate decode=\"docx\" command=\"&quot;soffice&quot; --convert-to pdf -outdir `dirname &quot;%i&quot;` &quot;%i&quot; 2&gt; &quot;%u&quot;; mv &quot;%i.pdf&quot; &quot;%o&quot;\"/>"
-    "  <delegate decode=\"dng:decode\" command=\"&quot;ufraw-batch&quot; --silent --create-id=also --out-type=png --out-depth=16 &quot;--output=%u.png&quot; &quot;%i&quot;\"/>"
-    "  <delegate decode=\"dot\" command=\"&quot;dot&quot; -Tsvg &quot;%i&quot; -o &quot;%o&quot;\"/>"
-    "  <delegate decode=\"dvi\" command=\"&quot;dvips&quot; -sstdout=%%stderr -o &quot;%o&quot; &quot;%i&quot;\"/>"
-    "  <delegate decode=\"dxf\" command=\"&quot;uniconvertor&quot; &quot;%i&quot; &quot;%o.svg&quot;; mv &quot;%o.svg&quot; &quot;%o&quot;\"/>"
-    "  <delegate decode=\"edit\" stealth=\"True\" command=\"&quot;xterm&quot; -title &quot;Edit Image Comment&quot; -e vi &quot;%o&quot;\"/>"
-    "  <delegate decode=\"eps\" encode=\"pdf\" mode=\"bi\" command=\"&quot;gs&quot; -sstdout=%%stderr -dQUIET -dSAFER -dBATCH -dNOPAUSE -dNOPROMPT -dMaxBitmap=500000000 &quot;-sDEVICE=pdfwrite&quot; &quot;-sOutputFile=%o&quot; &quot;-f%i&quot;\"/>"
-    "  <delegate decode=\"eps\" encode=\"ps\" mode=\"bi\" command=\"&quot;gs&quot; -sstdout=%%stderr -dQUIET -dSAFER -dBATCH -dNOPAUSE -dNOPROMPT -dMaxBitmap=500000000 -dAlignToPixels=0 -dGridFitTT=2 &quot;-sDEVICE=ps2write&quot; &quot;-sOutputFile=%o&quot; &quot;-f%i&quot;\"/>"
-    "  <delegate decode=\"fig\" command=\"&quot;uniconvertor&quot; &quot;%i&quot; &quot;%o.svg&quot;; mv &quot;%o.svg&quot; &quot;%o&quot;\"/>"
-    "  <delegate decode=\"hpg\" command=\"&quot;hp2xx&quot; -sstdout=%%stderr -m eps -f `basename &quot;%o&quot;` &quot;%i&quot;;     mv -f `basename &quot;%o&quot;` &quot;%o&quot;\"/>"
-    "  <delegate decode=\"hpgl\" command=\"&quot;hp2xx&quot; -sstdout=%%stderr -m eps -f `basename &quot;%o&quot;` &quot;%i&quot;;     mv -f `basename &quot;%o&quot;` &quot;%o&quot;\"/>"
-    "  <delegate decode=\"htm\" command=\"&quot;html2ps&quot; -U -o &quot;%o&quot; &quot;%i&quot;\"/>"
-    "  <delegate decode=\"html\" command=\"&quot;html2ps&quot; -U -o &quot;%o&quot; &quot;%i&quot;\"/>"
-    "  <delegate decode=\"ilbm\" command=\"&quot;ilbmtoppm&quot; &quot;%i&quot; &gt; &quot;%o&quot;\"/>"
-    "  <delegate decode=\"jpg\" encode=\"lep\" mode=\"encode\" command=\"&quot;lepton&quot; &quot;%i&quot; &quot;%o&quot;\"/>"
-    "  <delegate decode=\"jxr\" command=\"mv &quot;%i&quot; &quot;%i.jxr&quot;; &quot;JxrDecApp&quot; -i &quot;%i.jxr&quot; -o &quot;%o.pnm&quot;; mv &quot;%i.jxr&quot; &quot;%i&quot;; mv &quot;%o.pnm&quot; &quot;%o&quot;\"/>"
-    "  <delegate decode=\"lep\" mode=\"decode\" command=\"&quot;lepton&quot; &quot;%i&quot; &quot;%o&quot;\"/>"
-    "  <delegate decode=\"odt\" command=\"&quot;soffice&quot; --convert-to pdf -outdir `dirname &quot;%i&quot;` &quot;%i&quot; 2&gt; &quot;%u&quot;; mv &quot;%i.pdf&quot; &quot;%o&quot;\"/>"
-    "  <delegate decode=\"pcl:cmyk\" stealth=\"True\" command=\"&quot;pcl6&quot; -dQUIET -dSAFER -dBATCH -dNOPAUSE -dNOPROMPT -dMaxBitmap=500000000 -dAlignToPixels=0 -dGridFitTT=2 &quot;-sDEVICE=pamcmyk32&quot; -dTextAlphaBits=%u -dGraphicsAlphaBits=%u &quot;-r%s&quot; %s &quot;-sOutputFile=%s&quot; &quot;%s&quot;\"/>"
-    "  <delegate decode=\"pcl:color\" stealth=\"True\" command=\"&quot;pcl6&quot; -dQUIET -dSAFER -dBATCH -dNOPAUSE -dNOPROMPT -dMaxBitmap=500000000 -dAlignToPixels=0 -dGridFitTT=2 &quot;-sDEVICE=ppmraw&quot; -dTextAlphaBits=%u -dGraphicsAlphaBits=%u &quot;-r%s&quot; %s &quot;-sOutputFile=%s&quot; &quot;%s&quot;\"/>"
-    "  <delegate decode=\"pcl:mono\" stealth=\"True\" command=\"&quot;pcl6&quot; -dQUIET -dSAFER -dBATCH -dNOPAUSE -dNOPROMPT -dMaxBitmap=500000000 -dAlignToPixels=0 -dGridFitTT=2 &quot;-sDEVICE=pbmraw&quot; -dTextAlphaBits=%u -dGraphicsAlphaBits=%u &quot;-r%s&quot; %s &quot;-sOutputFile=%s&quot; &quot;%s&quot;\"/>"
-    "  <delegate decode=\"pdf\" encode=\"eps\" mode=\"bi\" command=\"&quot;gs&quot; -sstdout=%%stderr -dQUIET -dSAFER -dBATCH -dNOPAUSE -dNOPROMPT -dMaxBitmap=500000000 -dAlignToPixels=0 -dGridFitTT=2 -sPDFPassword=&quot;%a&quot; &quot;-sDEVICE=eps2write&quot; &quot;-sOutputFile=%o&quot; &quot;-f%i&quot;\"/>"
-    "  <delegate decode=\"pdf\" encode=\"ps\" mode=\"bi\" command=\"&quot;gs&quot; -sstdout=%%stderr -dQUIET -dSAFER -dBATCH -dNOPAUSE -dNOPROMPT -dMaxBitmap=500000000 -dAlignToPixels=0 -dGridFitTT=2 &quot;-sDEVICE=ps2write&quot; -sPDFPassword=&quot;%a&quot; &quot;-sOutputFile=%o&quot; &quot;-f%i&quot;\"/>"
-    "  <delegate decode=\"png\" encode=\"webp\" command=\"&quot;cwebp&quot; -quiet -q %Q &quot;%i&quot; -o &quot;%o&quot;\"/>"
-    "  <delegate decode=\"pnm\" encode=\"ilbm\" mode=\"encode\" command=\"&quot;ppmtoilbm&quot; -24if &quot;%i&quot; &gt; &quot;%o&quot;\"/>"
-    "  <delegate decode=\"bmp\" encode=\"jxr\" command=\"mv &quot;%i&quot; &quot;%i.bmp&quot;; &quot;JxrEncApp&quot; -i &quot;%i.bmp&quot; -o &quot;%o.jxr&quot;; mv &quot;%i.bmp&quot; &quot;%i&quot;; mv &quot;%o.jxr&quot; &quot;%o&quot;\"/>"
-    "  <delegate decode=\"bmp\" encode=\"wdp\" command=\"mv &quot;%i&quot; &quot;%i.bmp&quot;; &quot;JxrEncApp&quot; -i &quot;%i.bmp&quot; -o &quot;%o.jxr&quot;; mv &quot;%i.bmp&quot; &quot;%i&quot;; mv &quot;%o.jxr&quot; &quot;%o&quot;\"/>"
-    "  <delegate decode=\"ppt\" command=\"&quot;soffice&quot; --convert-to pdf -outdir `dirname &quot;%i&quot;` &quot;%i&quot; 2&gt; &quot;%u&quot;; mv &quot;%i.pdf&quot; &quot;%o&quot;\"/>"
-    "  <delegate decode=\"pptx\" command=\"&quot;soffice&quot; --convert-to pdf -outdir `dirname &quot;%i&quot;` &quot;%i&quot; 2&gt; &quot;%u&quot;; mv &quot;%i.pdf&quot; &quot;%o&quot;\"/>"
-    "  <delegate decode=\"ps\" encode=\"prt\" command=\"&quot;lpr&quot; &quot;%i&quot;\"/>"
-    "  <delegate decode=\"ps:alpha\" stealth=\"True\" command=\"&quot;gs&quot; -sstdout=%%stderr -dQUIET -dSAFER -dBATCH -dNOPAUSE -dNOPROMPT -dMaxBitmap=500000000 -dAlignToPixels=0 -dGridFitTT=2 &quot;-sDEVICE=pngalpha&quot; -dTextAlphaBits=%u -dGraphicsAlphaBits=%u &quot;-r%s&quot; %s &quot;-sOutputFile=%s&quot; &quot;-f%s&quot; &quot;-f%s&quot;\"/>"
-    "  <delegate decode=\"ps:cmyk\" stealth=\"True\" command=\"&quot;gs&quot; -sstdout=%%stderr -dQUIET -dSAFER -dBATCH -dNOPAUSE -dNOPROMPT -dMaxBitmap=500000000 -dAlignToPixels=0 -dGridFitTT=2 &quot;-sDEVICE=pamcmyk32&quot; -dTextAlphaBits=%u -dGraphicsAlphaBits=%u &quot;-r%s&quot; %s &quot;-sOutputFile=%s&quot; &quot;-f%s&quot; &quot;-f%s&quot;\"/>"
-    "  <delegate decode=\"ps:color\" stealth=\"True\" command=\"&quot;gs&quot; -sstdout=%%stderr -dQUIET -dSAFER -dBATCH -dNOPAUSE -dNOPROMPT -dMaxBitmap=500000000 -dAlignToPixels=0 -dGridFitTT=2 &quot;-sDEVICE=pnmraw&quot; -dTextAlphaBits=%u -dGraphicsAlphaBits=%u &quot;-r%s&quot; %s &quot;-sOutputFile=%s&quot; &quot;-f%s&quot; &quot;-f%s&quot;\"/>"
-    "  <delegate decode=\"ps\" encode=\"eps\" mode=\"bi\" command=\"&quot;gs&quot; -sstdout=%%stderr -dQUIET -dSAFER -dBATCH -dNOPAUSE -dNOPROMPT -dMaxBitmap=500000000 -dAlignToPixels=0 -dGridFitTT=2 &quot;-sDEVICE=eps2write&quot; &quot;-sOutputFile=%o&quot; &quot;-f%i&quot;\"/>"
-    "  <delegate decode=\"ps\" encode=\"pdf\" mode=\"bi\" command=\"&quot;gs&quot; -sstdout=%%stderr -dQUIET -dSAFER -dBATCH -dNOPAUSE -dNOPROMPT -dMaxBitmap=500000000 -dAlignToPixels=0 -dGridFitTT=2 &quot;-sDEVICE=pdfwrite&quot; &quot;-sOutputFile=%o&quot; &quot;-f%i&quot;\"/>"
-    "  <delegate decode=\"ps\" encode=\"print\" mode=\"encode\" command=\"lpr &quot;%i&quot;\"/>"
-    "  <delegate decode=\"ps:mono\" stealth=\"True\" command=\"&quot;gs&quot; -sstdout=%%stderr -dQUIET -dSAFER -dBATCH -dNOPAUSE -dNOPROMPT -dMaxBitmap=500000000 -dAlignToPixels=0 -dGridFitTT=2 &quot;-sDEVICE=pbmraw&quot; -dTextAlphaBits=%u -dGraphicsAlphaBits=%u &quot;-r%s&quot; %s &quot;-sOutputFile=%s&quot; &quot;-f%s&quot; &quot;-f%s&quot;\"/>"
-    "  <delegate decode=\"shtml\" command=\"&quot;html2ps&quot; -U -o &quot;%o&quot; &quot;%i&quot;\"/>"
-    "  <delegate decode=\"sid\" command=\"&quot;mrsidgeodecode&quot; -if sid -i &quot;%i&quot; -of tif -o &quot;%o&quot; &gt; &quot;%u&quot;\"/>"
-    "  <delegate decode=\"svg\" command=\"&quot;rsvg-convert&quot; -o &quot;%o&quot; &quot;%i&quot;\"/>"
-    "  <delegate decode=\"svg:decode\" stealth=\"True\" command=\"&quot;inkscape&quot; &quot;%s&quot; --export-png=&quot;%s&quot; --export-dpi=&quot;%s&quot; --export-background=&quot;%s&quot; --export-background-opacity=&quot;%s&quot; &gt; &quot;%s&quot; 2&gt;&amp;1\"/>"
-    "  <delegate decode=\"tiff\" encode=\"launch\" mode=\"encode\" command=\"&quot;gimp&quot; &quot;%i&quot;\"/>"
-    "  <delegate decode=\"wdp\" command=\"mv &quot;%i&quot; &quot;%i.jxr&quot;; &quot;JxrDecApp&quot; -i &quot;%i.jxr&quot; -o &quot;%o.bmp&quot;; mv &quot;%i.jxr&quot; &quot;%i&quot;; mv &quot;%o.bmp&quot; &quot;%o&quot;\"/>"
-    "  <delegate decode=\"webp\" command=\"&quot;dwebp&quot; -pam &quot;%i&quot; -o &quot;%o&quot;\"/>"
-    "  <delegate decode=\"xls\" command=\"&quot;soffice&quot; --convert-to pdf -outdir `dirname &quot;%i&quot;` &quot;%i&quot; 2&gt; &quot;%u&quot;; mv &quot;%i.pdf&quot; &quot;%o&quot;\"/>"
-    "  <delegate decode=\"xlsx\" command=\"&quot;soffice&quot; --convert-to pdf -outdir `dirname &quot;%i&quot;` &quot;%i&quot; 2&gt; &quot;%u&quot;; mv &quot;%i.pdf&quot; &quot;%o&quot;\"/>"
-    "  <delegate decode=\"xps:cmyk\" stealth=\"True\" command=\"&quot;gxps&quot; -dQUIET -dSAFER -dBATCH -dNOPAUSE -dNOPROMPT -dMaxBitmap=500000000 -dAlignToPixels=0 -dGridFitTT=2 &quot;-sDEVICE=bmpsep8&quot; -dTextAlphaBits=%u -dGraphicsAlphaBits=%u &quot;-r%s&quot; %s &quot;-sOutputFile=%s&quot; &quot;%s&quot;\"/>"
-    "  <delegate decode=\"xps:color\" stealth=\"True\" command=\"&quot;gxps&quot; -dQUIET -dSAFER -dBATCH -dNOPAUSE -dNOPROMPT -dMaxBitmap=500000000 -dAlignToPixels=0 -dGridFitTT=2 &quot;-sDEVICE=ppmraw&quot; -dTextAlphaBits=%u -dGraphicsAlphaBits=%u &quot;-r%s&quot; %s &quot;-sOutputFile=%s&quot; &quot;%s&quot;\"/>"
-    "  <delegate decode=\"xps:mono\" stealth=\"True\" command=\"&quot;gxps&quot; -dQUIET -dSAFER -dBATCH -dNOPAUSE -dNOPROMPT -dMaxBitmap=500000000 -dAlignToPixels=0 -dGridFitTT=2 &quot;-sDEVICE=pbmraw&quot; -dTextAlphaBits=%u -dGraphicsAlphaBits=%u &quot;-r%s&quot; %s &quot;-sOutputFile=%s&quot; &quot;%s&quot;\"/>"
-    "  <delegate decode=\"video:decode\" command=\"&quot;ffmpeg&quot; -nostdin -loglevel error -i &quot;%s&quot; -an -f rawvideo -y %s &quot;%s&quot;\"/>"
-    "  <delegate encode=\"video:encode\" stealth=\"True\" command=\"&quot;ffmpeg&quot; -nostdin -loglevel error -i &quot;%s%%d.%s&quot; %s &quot;%s.%s&quot;\"/>"
+    "  <delegate decode=\"bpg\" command=\"" DELEGATE_ESC "bpgdec" DELEGATE_ESC " -b 16 -o " DELEGATE_ESC "%o.png" DELEGATE_ESC " " DELEGATE_ESC "%i" DELEGATE_ESC "; mv " DELEGATE_ESC "%o.png" DELEGATE_ESC " " DELEGATE_ESC "%o" DELEGATE_ESC "\"/>"
+    "  <delegate decode=\"png\" encode=\"bpg\" command=\"" DELEGATE_ESC "bpgenc" DELEGATE_ESC " -b 12 -q %~ -o " DELEGATE_ESC "%o" DELEGATE_ESC " " DELEGATE_ESC "%i" DELEGATE_ESC "\"/>"
+    "  <delegate decode=\"browse\" stealth=\"True\" spawn=\"True\" command=\"" DELEGATE_ESC "xdg-open" DELEGATE_ESC " https://imagemagick.org/; rm " DELEGATE_ESC "%i" DELEGATE_ESC "\"/>"
+    "  <delegate decode=\"cdr\" command=\"" DELEGATE_ESC "uniconvertor" DELEGATE_ESC " " DELEGATE_ESC "%i" DELEGATE_ESC " " DELEGATE_ESC "%o.svg" DELEGATE_ESC "; mv " DELEGATE_ESC "%o.svg" DELEGATE_ESC " " DELEGATE_ESC "%o" DELEGATE_ESC "\"/>"
+    "  <delegate decode=\"cgm\" command=\"" DELEGATE_ESC "uniconvertor" DELEGATE_ESC " " DELEGATE_ESC "%i" DELEGATE_ESC " " DELEGATE_ESC "%o.svg" DELEGATE_ESC "; mv " DELEGATE_ESC "%o.svg" DELEGATE_ESC " " DELEGATE_ESC "%o" DELEGATE_ESC "\"/>"
+    "  <delegate decode=\"http\" command=\"" DELEGATE_ESC "curl" DELEGATE_ESC " -s -L -o " DELEGATE_ESC "%o" DELEGATE_ESC " " DELEGATE_ESC "http:%M" DELEGATE_ESC "\"/>"
+    "  <delegate decode=\"https\" command=\"" DELEGATE_ESC "curl" DELEGATE_ESC " -s -L -o " DELEGATE_ESC "%o" DELEGATE_ESC " " DELEGATE_ESC "https:%M" DELEGATE_ESC "\"/>"
+    "  <delegate decode=\"doc\" command=\"" DELEGATE_ESC "soffice" DELEGATE_ESC " --convert-to pdf -outdir `dirname " DELEGATE_ESC "%i" DELEGATE_ESC "` " DELEGATE_ESC "%i" DELEGATE_ESC " 2&gt; " DELEGATE_ESC "%u" DELEGATE_ESC "; mv " DELEGATE_ESC "%i.pdf" DELEGATE_ESC " " DELEGATE_ESC "%o" DELEGATE_ESC "\"/>"
+    "  <delegate decode=\"docx\" command=\"" DELEGATE_ESC "soffice" DELEGATE_ESC " --convert-to pdf -outdir `dirname " DELEGATE_ESC "%i" DELEGATE_ESC "` " DELEGATE_ESC "%i" DELEGATE_ESC " 2&gt; " DELEGATE_ESC "%u" DELEGATE_ESC "; mv " DELEGATE_ESC "%i.pdf" DELEGATE_ESC " " DELEGATE_ESC "%o" DELEGATE_ESC "\"/>"
+    "  <delegate decode=\"dng:decode\" command=\"" DELEGATE_ESC "ufraw-batch" DELEGATE_ESC " --silent --create-id=also --out-type=png --out-depth=16 " DELEGATE_ESC "--output=%u.png" DELEGATE_ESC " " DELEGATE_ESC "%i" DELEGATE_ESC "\"/>"
+    "  <delegate decode=\"dot\" command=\"" DELEGATE_ESC "dot" DELEGATE_ESC " -Tsvg " DELEGATE_ESC "%i" DELEGATE_ESC " -o " DELEGATE_ESC "%o" DELEGATE_ESC "\"/>"
+    "  <delegate decode=\"dvi\" command=\"" DELEGATE_ESC "dvips" DELEGATE_ESC " -sstdout=%%stderr -o " DELEGATE_ESC "%o" DELEGATE_ESC " " DELEGATE_ESC "%i" DELEGATE_ESC "\"/>"
+    "  <delegate decode=\"dxf\" command=\"" DELEGATE_ESC "uniconvertor" DELEGATE_ESC " " DELEGATE_ESC "%i" DELEGATE_ESC " " DELEGATE_ESC "%o.svg" DELEGATE_ESC "; mv " DELEGATE_ESC "%o.svg" DELEGATE_ESC " " DELEGATE_ESC "%o" DELEGATE_ESC "\"/>"
+    "  <delegate decode=\"edit\" stealth=\"True\" command=\"" DELEGATE_ESC "xterm" DELEGATE_ESC " -title " DELEGATE_ESC "Edit Image Comment" DELEGATE_ESC " -e vi " DELEGATE_ESC "%o" DELEGATE_ESC "\"/>"
+    "  <delegate decode=\"eps\" encode=\"pdf\" mode=\"bi\" command=\"" DELEGATE_ESC "gs" DELEGATE_ESC " -sstdout=%%stderr -dQUIET -dSAFER -dBATCH -dNOPAUSE -dNOPROMPT -dMaxBitmap=500000000 " DELEGATE_ESC "-sDEVICE=pdfwrite" DELEGATE_ESC " " DELEGATE_ESC "-sOutputFile=%o" DELEGATE_ESC " " DELEGATE_ESC "-f%i" DELEGATE_ESC "\"/>"
+    "  <delegate decode=\"eps\" encode=\"ps\" mode=\"bi\" command=\"" DELEGATE_ESC "gs" DELEGATE_ESC " -sstdout=%%stderr -dQUIET -dSAFER -dBATCH -dNOPAUSE -dNOPROMPT -dMaxBitmap=500000000 -dAlignToPixels=0 -dGridFitTT=2 " DELEGATE_ESC "-sDEVICE=ps2write" DELEGATE_ESC " " DELEGATE_ESC "-sOutputFile=%o" DELEGATE_ESC " " DELEGATE_ESC "-f%i" DELEGATE_ESC "\"/>"
+    "  <delegate decode=\"fig\" command=\"" DELEGATE_ESC "uniconvertor" DELEGATE_ESC " " DELEGATE_ESC "%i" DELEGATE_ESC " " DELEGATE_ESC "%o.svg" DELEGATE_ESC "; mv " DELEGATE_ESC "%o.svg" DELEGATE_ESC " " DELEGATE_ESC "%o" DELEGATE_ESC "\"/>"
+    "  <delegate decode=\"hpg\" command=\"" DELEGATE_ESC "hp2xx" DELEGATE_ESC " -sstdout=%%stderr -m eps -f `basename " DELEGATE_ESC "%o" DELEGATE_ESC "` " DELEGATE_ESC "%i" DELEGATE_ESC ";     mv -f `basename " DELEGATE_ESC "%o" DELEGATE_ESC "` " DELEGATE_ESC "%o" DELEGATE_ESC "\"/>"
+    "  <delegate decode=\"hpgl\" command=\"" DELEGATE_ESC "hp2xx" DELEGATE_ESC " -sstdout=%%stderr -m eps -f `basename " DELEGATE_ESC "%o" DELEGATE_ESC "` " DELEGATE_ESC "%i" DELEGATE_ESC ";     mv -f `basename " DELEGATE_ESC "%o" DELEGATE_ESC "` " DELEGATE_ESC "%o" DELEGATE_ESC "\"/>"
+    "  <delegate decode=\"htm\" command=\"" DELEGATE_ESC "html2ps" DELEGATE_ESC " -U -o " DELEGATE_ESC "%o" DELEGATE_ESC " " DELEGATE_ESC "%i" DELEGATE_ESC "\"/>"
+    "  <delegate decode=\"html\" command=\"" DELEGATE_ESC "html2ps" DELEGATE_ESC " -U -o " DELEGATE_ESC "%o" DELEGATE_ESC " " DELEGATE_ESC "%i" DELEGATE_ESC "\"/>"
+    "  <delegate decode=\"ilbm\" command=\"" DELEGATE_ESC "ilbmtoppm" DELEGATE_ESC " " DELEGATE_ESC "%i" DELEGATE_ESC " &gt; " DELEGATE_ESC "%o" DELEGATE_ESC "\"/>"
+    "  <delegate decode=\"jpg\" encode=\"lep\" mode=\"encode\" command=\"" DELEGATE_ESC "lepton" DELEGATE_ESC " " DELEGATE_ESC "%i" DELEGATE_ESC " " DELEGATE_ESC "%o" DELEGATE_ESC "\"/>"
+    "  <delegate decode=\"jxr\" command=\"mv " DELEGATE_ESC "%i" DELEGATE_ESC " " DELEGATE_ESC "%i.jxr" DELEGATE_ESC "; " DELEGATE_ESC "JxrDecApp" DELEGATE_ESC " -i " DELEGATE_ESC "%i.jxr" DELEGATE_ESC " -o " DELEGATE_ESC "%o.tiff" DELEGATE_ESC "; mv " DELEGATE_ESC "%i.jxr" DELEGATE_ESC " " DELEGATE_ESC "%i" DELEGATE_ESC "; mv " DELEGATE_ESC "%o.tiff" DELEGATE_ESC " " DELEGATE_ESC "%o" DELEGATE_ESC "\"/>"
+    "  <delegate decode=\"lep\" mode=\"decode\" command=\"" DELEGATE_ESC "lepton" DELEGATE_ESC " " DELEGATE_ESC "%i" DELEGATE_ESC " " DELEGATE_ESC "%o" DELEGATE_ESC "\"/>"
+    "  <delegate decode=\"odt\" command=\"" DELEGATE_ESC "soffice" DELEGATE_ESC " --convert-to pdf -outdir `dirname " DELEGATE_ESC "%i" DELEGATE_ESC "` " DELEGATE_ESC "%i" DELEGATE_ESC " 2&gt; " DELEGATE_ESC "%u" DELEGATE_ESC "; mv " DELEGATE_ESC "%i.pdf" DELEGATE_ESC " " DELEGATE_ESC "%o" DELEGATE_ESC "\"/>"
+    "  <delegate decode=\"pcl:cmyk\" stealth=\"True\" command=\"" DELEGATE_ESC "pcl6" DELEGATE_ESC " -dQUIET -dSAFER -dBATCH -dNOPAUSE -dNOPROMPT -dMaxBitmap=500000000 -dAlignToPixels=0 -dGridFitTT=2 " DELEGATE_ESC "-sDEVICE=pamcmyk32" DELEGATE_ESC " -dTextAlphaBits=%u -dGraphicsAlphaBits=%u " DELEGATE_ESC "-r%s" DELEGATE_ESC " %s " DELEGATE_ESC "-sOutputFile=%s" DELEGATE_ESC " " DELEGATE_ESC "%s" DELEGATE_ESC "\"/>"
+    "  <delegate decode=\"pcl:color\" stealth=\"True\" command=\"" DELEGATE_ESC "pcl6" DELEGATE_ESC " -dQUIET -dSAFER -dBATCH -dNOPAUSE -dNOPROMPT -dMaxBitmap=500000000 -dAlignToPixels=0 -dGridFitTT=2 " DELEGATE_ESC "-sDEVICE=ppmraw" DELEGATE_ESC " -dTextAlphaBits=%u -dGraphicsAlphaBits=%u " DELEGATE_ESC "-r%s" DELEGATE_ESC " %s " DELEGATE_ESC "-sOutputFile=%s" DELEGATE_ESC " " DELEGATE_ESC "%s" DELEGATE_ESC "\"/>"
+    "  <delegate decode=\"pcl:mono\" stealth=\"True\" command=\"" DELEGATE_ESC "pcl6" DELEGATE_ESC " -dQUIET -dSAFER -dBATCH -dNOPAUSE -dNOPROMPT -dMaxBitmap=500000000 -dAlignToPixels=0 -dGridFitTT=2 " DELEGATE_ESC "-sDEVICE=pbmraw" DELEGATE_ESC " -dTextAlphaBits=%u -dGraphicsAlphaBits=%u " DELEGATE_ESC "-r%s" DELEGATE_ESC " %s " DELEGATE_ESC "-sOutputFile=%s" DELEGATE_ESC " " DELEGATE_ESC "%s" DELEGATE_ESC "\"/>"
+    "  <delegate decode=\"pdf\" encode=\"eps\" mode=\"bi\" command=\"" DELEGATE_ESC "gs" DELEGATE_ESC " -sstdout=%%stderr -dQUIET -dSAFER -dBATCH -dNOPAUSE -dNOPROMPT -dMaxBitmap=500000000 -dAlignToPixels=0 -dGridFitTT=2 -sPDFPassword=" DELEGATE_ESC "%a" DELEGATE_ESC " " DELEGATE_ESC "-sDEVICE=eps2write" DELEGATE_ESC " " DELEGATE_ESC "-sOutputFile=%o" DELEGATE_ESC " " DELEGATE_ESC "-f%i" DELEGATE_ESC "\"/>"
+    "  <delegate decode=\"pdf\" encode=\"ps\" mode=\"bi\" command=\"" DELEGATE_ESC "gs" DELEGATE_ESC " -sstdout=%%stderr -dQUIET -dSAFER -dBATCH -dNOPAUSE -dNOPROMPT -dMaxBitmap=500000000 -dAlignToPixels=0 -dGridFitTT=2 " DELEGATE_ESC "-sDEVICE=ps2write" DELEGATE_ESC " -sPDFPassword=" DELEGATE_ESC "%a" DELEGATE_ESC " " DELEGATE_ESC "-sOutputFile=%o" DELEGATE_ESC " " DELEGATE_ESC "-f%i" DELEGATE_ESC "\"/>"
+    "  <delegate decode=\"png\" encode=\"clipboard\" command=\"" DELEGATE_ESC "xclip" DELEGATE_ESC " -selection clipboard -t image/png " DELEGATE_ESC "%i" DELEGATE_ESC "\"/>"
+    "  <delegate decode=\"clipboard\" command=\"" DELEGATE_ESC "xclip" DELEGATE_ESC " -selection clipboard -o &gt; " DELEGATE_ESC "%o" DELEGATE_ESC "\"/>"
+    "  <delegate decode=\"png\" encode=\"webp\" command=\"" DELEGATE_ESC "cwebp" DELEGATE_ESC " -quiet -q %Q " DELEGATE_ESC "%i" DELEGATE_ESC " -o " DELEGATE_ESC "%o" DELEGATE_ESC "\"/>"
+    "  <delegate decode=\"pnm\" encode=\"ilbm\" mode=\"encode\" command=\"" DELEGATE_ESC "ppmtoilbm" DELEGATE_ESC " -24if " DELEGATE_ESC "%i" DELEGATE_ESC " &gt; " DELEGATE_ESC "%o" DELEGATE_ESC "\"/>"
+    "  <delegate decode=\"tiff\" encode=\"jxr\" command=\"mv " DELEGATE_ESC "%i" DELEGATE_ESC " " DELEGATE_ESC "%i.tiff" DELEGATE_ESC "; " DELEGATE_ESC "JxrEncApp" DELEGATE_ESC " -i " DELEGATE_ESC "%i.tiff" DELEGATE_ESC " -o " DELEGATE_ESC "%o.jxr" DELEGATE_ESC "; mv " DELEGATE_ESC "%i.tiff" DELEGATE_ESC " " DELEGATE_ESC "%i" DELEGATE_ESC "; mv " DELEGATE_ESC "%o.jxr" DELEGATE_ESC " " DELEGATE_ESC "%o" DELEGATE_ESC "\"/>"
+    "  <delegate decode=\"tiff\" encode=\"wdp\" command=\"mv " DELEGATE_ESC "%i" DELEGATE_ESC " " DELEGATE_ESC "%i.tiff" DELEGATE_ESC "; " DELEGATE_ESC "JxrEncApp" DELEGATE_ESC " -i " DELEGATE_ESC "%i.tiff" DELEGATE_ESC " -o " DELEGATE_ESC "%o.jxr" DELEGATE_ESC "; mv " DELEGATE_ESC "%i.tiff" DELEGATE_ESC " " DELEGATE_ESC "%i" DELEGATE_ESC "; mv " DELEGATE_ESC "%o.jxr" DELEGATE_ESC " " DELEGATE_ESC "%o" DELEGATE_ESC "\"/>"
+    "  <delegate decode=\"ppt\" command=\"" DELEGATE_ESC "soffice" DELEGATE_ESC " --convert-to pdf -outdir `dirname " DELEGATE_ESC "%i" DELEGATE_ESC "` " DELEGATE_ESC "%i" DELEGATE_ESC " 2&gt; " DELEGATE_ESC "%u" DELEGATE_ESC "; mv " DELEGATE_ESC "%i.pdf" DELEGATE_ESC " " DELEGATE_ESC "%o" DELEGATE_ESC "\"/>"
+    "  <delegate decode=\"pptx\" command=\"" DELEGATE_ESC "soffice" DELEGATE_ESC " --convert-to pdf -outdir `dirname " DELEGATE_ESC "%i" DELEGATE_ESC "` " DELEGATE_ESC "%i" DELEGATE_ESC " 2&gt; " DELEGATE_ESC "%u" DELEGATE_ESC "; mv " DELEGATE_ESC "%i.pdf" DELEGATE_ESC " " DELEGATE_ESC "%o" DELEGATE_ESC "\"/>"
+    "  <delegate decode=\"ps\" encode=\"prt\" command=\"" DELEGATE_ESC "lpr" DELEGATE_ESC " " DELEGATE_ESC "%i" DELEGATE_ESC "\"/>"
+    "  <delegate decode=\"ps:alpha\" stealth=\"True\" command=\"" DELEGATE_ESC "gs" DELEGATE_ESC " -sstdout=%%stderr -dQUIET -dSAFER -dBATCH -dNOPAUSE -dNOPROMPT -dMaxBitmap=500000000 -dAlignToPixels=0 -dGridFitTT=2 " DELEGATE_ESC "-sDEVICE=pngalpha" DELEGATE_ESC " -dTextAlphaBits=%u -dGraphicsAlphaBits=%u " DELEGATE_ESC "-r%s" DELEGATE_ESC " %s " DELEGATE_ESC "-sOutputFile=%s" DELEGATE_ESC " " DELEGATE_ESC "-f%s" DELEGATE_ESC " " DELEGATE_ESC "-f%s" DELEGATE_ESC "\"/>"
+    "  <delegate decode=\"ps:cmyk\" stealth=\"True\" command=\"" DELEGATE_ESC "gs" DELEGATE_ESC " -sstdout=%%stderr -dQUIET -dSAFER -dBATCH -dNOPAUSE -dNOPROMPT -dMaxBitmap=500000000 -dAlignToPixels=0 -dGridFitTT=2 " DELEGATE_ESC "-sDEVICE=pamcmyk32" DELEGATE_ESC " -dTextAlphaBits=%u -dGraphicsAlphaBits=%u " DELEGATE_ESC "-r%s" DELEGATE_ESC " %s " DELEGATE_ESC "-sOutputFile=%s" DELEGATE_ESC " " DELEGATE_ESC "-f%s" DELEGATE_ESC " " DELEGATE_ESC "-f%s" DELEGATE_ESC "\"/>"
+    "  <delegate decode=\"ps:color\" stealth=\"True\" command=\"" DELEGATE_ESC "gs" DELEGATE_ESC " -sstdout=%%stderr -dQUIET -dSAFER -dBATCH -dNOPAUSE -dNOPROMPT -dMaxBitmap=500000000 -dAlignToPixels=0 -dGridFitTT=2 " DELEGATE_ESC "-sDEVICE=pnmraw" DELEGATE_ESC " -dTextAlphaBits=%u -dGraphicsAlphaBits=%u " DELEGATE_ESC "-r%s" DELEGATE_ESC " %s " DELEGATE_ESC "-sOutputFile=%s" DELEGATE_ESC " " DELEGATE_ESC "-f%s" DELEGATE_ESC " " DELEGATE_ESC "-f%s" DELEGATE_ESC "\"/>"
+    "  <delegate decode=\"ps\" encode=\"eps\" mode=\"bi\" command=\"" DELEGATE_ESC "gs" DELEGATE_ESC " -sstdout=%%stderr -dQUIET -dSAFER -dBATCH -dNOPAUSE -dNOPROMPT -dMaxBitmap=500000000 -dAlignToPixels=0 -dGridFitTT=2 " DELEGATE_ESC "-sDEVICE=eps2write" DELEGATE_ESC " " DELEGATE_ESC "-sOutputFile=%o" DELEGATE_ESC " " DELEGATE_ESC "-f%i" DELEGATE_ESC "\"/>"
+    "  <delegate decode=\"ps\" encode=\"pdf\" mode=\"bi\" command=\"" DELEGATE_ESC "gs" DELEGATE_ESC " -sstdout=%%stderr -dQUIET -dSAFER -dBATCH -dNOPAUSE -dNOPROMPT -dMaxBitmap=500000000 -dAlignToPixels=0 -dGridFitTT=2 " DELEGATE_ESC "-sDEVICE=pdfwrite" DELEGATE_ESC " " DELEGATE_ESC "-sOutputFile=%o" DELEGATE_ESC " " DELEGATE_ESC "-f%i" DELEGATE_ESC "\"/>"
+    "  <delegate decode=\"ps\" encode=\"print\" mode=\"encode\" command=\"lpr " DELEGATE_ESC "%i" DELEGATE_ESC "\"/>"
+    "  <delegate decode=\"ps:mono\" stealth=\"True\" command=\"" DELEGATE_ESC "gs" DELEGATE_ESC " -sstdout=%%stderr -dQUIET -dSAFER -dBATCH -dNOPAUSE -dNOPROMPT -dMaxBitmap=500000000 -dAlignToPixels=0 -dGridFitTT=2 " DELEGATE_ESC "-sDEVICE=pbmraw" DELEGATE_ESC " -dTextAlphaBits=%u -dGraphicsAlphaBits=%u " DELEGATE_ESC "-r%s" DELEGATE_ESC " %s " DELEGATE_ESC "-sOutputFile=%s" DELEGATE_ESC " " DELEGATE_ESC "-f%s" DELEGATE_ESC " " DELEGATE_ESC "-f%s" DELEGATE_ESC "\"/>"
+    "  <delegate decode=\"shtml\" command=\"" DELEGATE_ESC "html2ps" DELEGATE_ESC " -U -o " DELEGATE_ESC "%o" DELEGATE_ESC " " DELEGATE_ESC "%i" DELEGATE_ESC "\"/>"
+    "  <delegate decode=\"sid\" command=\"" DELEGATE_ESC "mrsidgeodecode" DELEGATE_ESC " -if sid -i " DELEGATE_ESC "%i" DELEGATE_ESC " -of tif -o " DELEGATE_ESC "%o" DELEGATE_ESC " &gt; " DELEGATE_ESC "%u" DELEGATE_ESC "\"/>"
+    "  <delegate decode=\"svg\" command=\"" DELEGATE_ESC "rsvg-convert" DELEGATE_ESC " --dpi-x %x --dpi-y %y -o " DELEGATE_ESC "%o" DELEGATE_ESC " " DELEGATE_ESC "%i" DELEGATE_ESC "\"/>"
+#ifndef MAGICKCORE_RSVG_DELEGATE
+    "  <delegate decode=\"svg:decode\" stealth=\"True\" command=\"" DELEGATE_ESC "inkscape" DELEGATE_ESC " " DELEGATE_ESC "%s" DELEGATE_ESC " --export-png=" DELEGATE_ESC "%s" DELEGATE_ESC " --export-dpi=" DELEGATE_ESC "%s" DELEGATE_ESC " --export-background=" DELEGATE_ESC "%s" DELEGATE_ESC " --export-background-opacity=" DELEGATE_ESC "%s" DELEGATE_ESC "\"/>"
+#endif
+    "  <delegate decode=\"tiff\" encode=\"launch\" mode=\"encode\" command=\"" DELEGATE_ESC "gimp" DELEGATE_ESC " " DELEGATE_ESC "%i" DELEGATE_ESC "\"/>"
+    "  <delegate decode=\"wdp\" command=\"mv " DELEGATE_ESC "%i" DELEGATE_ESC " " DELEGATE_ESC "%i.jxr" DELEGATE_ESC "; " DELEGATE_ESC "JxrDecApp" DELEGATE_ESC " -i " DELEGATE_ESC "%i.jxr" DELEGATE_ESC " -o " DELEGATE_ESC "%o.tiff" DELEGATE_ESC "; mv " DELEGATE_ESC "%i.jxr" DELEGATE_ESC " " DELEGATE_ESC "%i" DELEGATE_ESC "; mv " DELEGATE_ESC "%o.tiff" DELEGATE_ESC " " DELEGATE_ESC "%o" DELEGATE_ESC "\"/>"
+    "  <delegate decode=\"webp\" command=\"" DELEGATE_ESC "dwebp" DELEGATE_ESC " -pam " DELEGATE_ESC "%i" DELEGATE_ESC " -o " DELEGATE_ESC "%o" DELEGATE_ESC "\"/>"
+    "  <delegate decode=\"xls\" command=\"" DELEGATE_ESC "soffice" DELEGATE_ESC " --convert-to pdf -outdir `dirname " DELEGATE_ESC "%i" DELEGATE_ESC "` " DELEGATE_ESC "%i" DELEGATE_ESC " 2&gt; " DELEGATE_ESC "%u" DELEGATE_ESC "; mv " DELEGATE_ESC "%i.pdf" DELEGATE_ESC " " DELEGATE_ESC "%o" DELEGATE_ESC "\"/>"
+    "  <delegate decode=\"xlsx\" command=\"" DELEGATE_ESC "soffice" DELEGATE_ESC " --convert-to pdf -outdir `dirname " DELEGATE_ESC "%i" DELEGATE_ESC "` " DELEGATE_ESC "%i" DELEGATE_ESC " 2&gt; " DELEGATE_ESC "%u" DELEGATE_ESC "; mv " DELEGATE_ESC "%i.pdf" DELEGATE_ESC " " DELEGATE_ESC "%o" DELEGATE_ESC "\"/>"
+    "  <delegate decode=\"xps:cmyk\" stealth=\"True\" command=\"" DELEGATE_ESC "gxps" DELEGATE_ESC " -dQUIET -dSAFER -dBATCH -dNOPAUSE -dNOPROMPT -dMaxBitmap=500000000 -dAlignToPixels=0 -dGridFitTT=2 " DELEGATE_ESC "-sDEVICE=bmpsep8" DELEGATE_ESC " -dTextAlphaBits=%u -dGraphicsAlphaBits=%u " DELEGATE_ESC "-r%s" DELEGATE_ESC " %s " DELEGATE_ESC "-sOutputFile=%s" DELEGATE_ESC " " DELEGATE_ESC "%s" DELEGATE_ESC "\"/>"
+    "  <delegate decode=\"xps:color\" stealth=\"True\" command=\"" DELEGATE_ESC "gxps" DELEGATE_ESC " -dQUIET -dSAFER -dBATCH -dNOPAUSE -dNOPROMPT -dMaxBitmap=500000000 -dAlignToPixels=0 -dGridFitTT=2 " DELEGATE_ESC "-sDEVICE=ppmraw" DELEGATE_ESC " -dTextAlphaBits=%u -dGraphicsAlphaBits=%u " DELEGATE_ESC "-r%s" DELEGATE_ESC " %s " DELEGATE_ESC "-sOutputFile=%s" DELEGATE_ESC " " DELEGATE_ESC "%s" DELEGATE_ESC "\"/>"
+    "  <delegate decode=\"xps:mono\" stealth=\"True\" command=\"" DELEGATE_ESC "gxps" DELEGATE_ESC " -dQUIET -dSAFER -dBATCH -dNOPAUSE -dNOPROMPT -dMaxBitmap=500000000 -dAlignToPixels=0 -dGridFitTT=2 " DELEGATE_ESC "-sDEVICE=pbmraw" DELEGATE_ESC " -dTextAlphaBits=%u -dGraphicsAlphaBits=%u " DELEGATE_ESC "-r%s" DELEGATE_ESC " %s " DELEGATE_ESC "-sOutputFile=%s" DELEGATE_ESC " " DELEGATE_ESC "%s" DELEGATE_ESC "\"/>"
+    "  <delegate decode=\"video:decode\" command=\"" DELEGATE_ESC "ffmpeg" DELEGATE_ESC " -nostdin -loglevel error -i " DELEGATE_ESC "%s" DELEGATE_ESC " -an -f rawvideo -y %s " DELEGATE_ESC "%s" DELEGATE_ESC "\"/>"
+    "  <delegate encode=\"video:encode\" stealth=\"True\" command=\"" DELEGATE_ESC "ffmpeg" DELEGATE_ESC " -nostdin -loglevel error -i " DELEGATE_ESC "%s%%d.%s" DELEGATE_ESC " %s " DELEGATE_ESC "%s.%s" DELEGATE_ESC "\"/>"
     "</delegatemap>";
-
+
+#undef DELEGATE_ESC
 /*
-  Global declaractions.
+  Global declarations.
 */
 static LinkedListInfo
   *delegate_cache = (LinkedListInfo *) NULL;
@@ -167,7 +179,7 @@ static SemaphoreInfo
   *delegate_semaphore = (SemaphoreInfo *) NULL;
 
 /*
-  Forward declaractions.
+  Forward declarations.
 */
 static MagickBooleanType
   IsDelegateCacheInstantiated(ExceptionInfo *),
@@ -402,33 +414,20 @@ MagickExport int ExternalDelegateCommand(const MagickBooleanType asynchronous,
 #if defined(MAGICKCORE_HAVE_POPEN)
   if ((asynchronous == MagickFalse) && (message !=  (char *) NULL))
     {
-      char
-        buffer[MagickPathExtent];
-
       FILE
         *file;
 
-      size_t
-        offset;
-
-      offset=0;
       file=popen_utf8(sanitize_command,"r");
       if (file == (FILE *) NULL)
         status=system(sanitize_command);
       else
         {
-          while (fgets(buffer,(int) sizeof(buffer),file) != NULL)
-          {
-            size_t
-              length;
+          size_t
+            offset = 0;
 
-            length=MagickMin(MagickPathExtent-offset,strlen(buffer)+1);
-            if (length > 0)
-              {
-                (void) CopyMagickString(message+offset,buffer,length);
-                offset+=length-1;
-              }
-          }
+          while ((offset < MagickPathExtent) &&
+                 (fgets(message+offset,(int) (MagickPathExtent-offset),file) != NULL))
+            offset+=strlen(message);
           status=pclose(file);
         }
     }
@@ -493,12 +492,12 @@ MagickExport int ExternalDelegateCommand(const MagickBooleanType asynchronous,
       want to 'move' a file.
 
       TODO: This won't work if one of the delegate parameters has a forward
-            slash as aparameter.
+            slash as a parameter.
     */
     p=strstr(sanitize_command,"cmd.exe /c");
     if (p != (char*) NULL)
       {
-        p+=10;
+        p+=(ptrdiff_t) 10;
         for ( ; *p != '\0'; p++)
           if (*p == '/')
             *p=(*DirectorySeparator);
@@ -600,7 +599,7 @@ static char *GetMagickPropertyLetter(ImageInfo *image_info,Image *image,
   string=(const char *) value;
   switch (letter)
   {
-    case 'a': /* authentication passphase */
+    case 'a': /* authentication passphrase */
     {
       WarnNoImageInfoReturn("\"%%%c\"",letter);
       string=GetImageOption(image_info,"authenticate");
@@ -709,7 +708,7 @@ static char *GetMagickPropertyLetter(ImageInfo *image_info,Image *image,
         image->scene);
       break;
     }
-    case 't': /* Base filename without directory or extention */
+    case 't': /* Base filename without directory or extension */
     {
       WarnNoImageReturn("\"%%%c\"",letter);
       GetPathComponent(image->magick_filename,BasePath,value);
@@ -918,7 +917,7 @@ static char *InterpretDelegateProperties(ImageInfo *image_info,
 #define ExtendInterpretText(string_length) \
 { \
   size_t length=(string_length); \
-  if ((size_t) (q-interpret_text+length+1) >= extent) \
+  if ((size_t) (q-interpret_text+(ssize_t) length+1) >= extent) \
     { \
       extent+=length; \
       interpret_text=(char *) ResizeQuantumMemory(interpret_text,extent+ \
@@ -941,13 +940,13 @@ static char *InterpretDelegateProperties(ImageInfo *image_info,
         return((char *) NULL); \
       q=interpret_text+strlen(interpret_text); \
      } \
-   q+=FormatLocaleString(q,extent,"%s=%s\n",(key),(value)); \
+   q+=(ptrdiff_t) FormatLocaleString(q,extent,"%s=%s\n",(key),(value)); \
 }
 
 #define AppendString2Text(string) \
 { \
   size_t length=strlen((string)); \
-  if ((size_t) (q-interpret_text+length+1) >= extent) \
+  if ((size_t) (q-interpret_text+(ssize_t) length+1) >= extent) \
     { \
       extent+=length; \
       interpret_text=(char *) ResizeQuantumMemory(interpret_text,extent+ \
@@ -957,7 +956,7 @@ static char *InterpretDelegateProperties(ImageInfo *image_info,
       q=interpret_text+strlen(interpret_text); \
     } \
   (void) CopyMagickString(q,(string),extent); \
-  q+=length; \
+  q+=(ptrdiff_t) length; \
 }
 
   char
@@ -1049,19 +1048,19 @@ static char *InterpretDelegateProperties(ImageInfo *image_info,
         if (LocaleNCompare("&lt;",p,4) == 0)
           {
             *q++='<';
-            p+=3;
+            p+=(ptrdiff_t) 3;
           }
         else
           if (LocaleNCompare("&gt;",p,4) == 0)
             {
               *q++='>';
-              p+=3;
+              p+=(ptrdiff_t) 3;
             }
           else
             if (LocaleNCompare("&amp;",p,5) == 0)
               {
                 *q++='&';
-                p+=4;
+                p+=(ptrdiff_t) 4;
               }
             else
               *q++=(*p);
@@ -1092,7 +1091,7 @@ static char *InterpretDelegateProperties(ImageInfo *image_info,
     if (number != MagickFalse)
       {
         /*
-          But only if not preceeded by a number!
+          But only if not preceded by a number!
         */
         *q++='%'; /* do NOT substitute the percent */
         p--;      /* back up one */
@@ -1224,6 +1223,9 @@ MagickExport const DelegateInfo *GetDelegateInfo(const char *decode,
   const char *encode,ExceptionInfo *exception)
 {
   const DelegateInfo
+    *delegate_info;
+
+  ElementInfo
     *p;
 
   assert(exception != (ExceptionInfo *) NULL);
@@ -1232,46 +1234,50 @@ MagickExport const DelegateInfo *GetDelegateInfo(const char *decode,
   /*
     Search for named delegate.
   */
+  delegate_info=(const DelegateInfo *) NULL;
   LockSemaphoreInfo(delegate_semaphore);
-  ResetLinkedListIterator(delegate_cache);
-  p=(const DelegateInfo *) GetNextValueInLinkedList(delegate_cache);
+  p=GetHeadElementInLinkedList(delegate_cache);
   if ((LocaleCompare(decode,"*") == 0) && (LocaleCompare(encode,"*") == 0))
     {
       UnlockSemaphoreInfo(delegate_semaphore);
-      return(p);
+      if (p != (ElementInfo *) NULL)
+        delegate_info=(const DelegateInfo* ) p->value;
+      return(delegate_info);
     }
-  while (p != (const DelegateInfo *) NULL)
+  while (p != (ElementInfo *) NULL)
   {
-    if (p->mode > 0)
+    delegate_info=(const DelegateInfo* ) p->value;
+    if (delegate_info->mode > 0)
       {
-        if (LocaleCompare(p->decode,decode) == 0)
+        if (LocaleCompare(delegate_info->decode,decode) == 0)
           break;
-        p=(const DelegateInfo *) GetNextValueInLinkedList(delegate_cache);
+        p=p->next;
         continue;
       }
-    if (p->mode < 0)
+    if (delegate_info->mode < 0)
       {
-        if (LocaleCompare(p->encode,encode) == 0)
+        if (LocaleCompare(delegate_info->encode,encode) == 0)
           break;
-        p=(const DelegateInfo *) GetNextValueInLinkedList(delegate_cache);
+        p=p->next;
         continue;
       }
-    if (LocaleCompare(decode,p->decode) == 0)
-      if (LocaleCompare(encode,p->encode) == 0)
+    if (LocaleCompare(decode,delegate_info->decode) == 0)
+      if (LocaleCompare(encode,delegate_info->encode) == 0)
         break;
     if (LocaleCompare(decode,"*") == 0)
-      if (LocaleCompare(encode,p->encode) == 0)
+      if (LocaleCompare(encode,delegate_info->encode) == 0)
         break;
-    if (LocaleCompare(decode,p->decode) == 0)
+    if (LocaleCompare(decode,delegate_info->decode) == 0)
       if (LocaleCompare(encode,"*") == 0)
         break;
-    p=(const DelegateInfo *) GetNextValueInLinkedList(delegate_cache);
+    p=p->next;
   }
-  if (p != (const DelegateInfo *) NULL)
-    (void) InsertValueInLinkedList(delegate_cache,0,
-      RemoveElementByValueFromLinkedList(delegate_cache,p));
+  if (p == (ElementInfo *) NULL)
+    delegate_info=(const DelegateInfo *) NULL;
+  else
+    SetHeadElementInLinkedList(delegate_cache,p);
   UnlockSemaphoreInfo(delegate_semaphore);
-  return(p);
+  return(delegate_info);
 }
 
 /*
@@ -1342,44 +1348,45 @@ MagickExport const DelegateInfo **GetDelegateInfoList(const char *pattern,
   const DelegateInfo
     **delegates;
 
-  const DelegateInfo
+  ElementInfo
     *p;
 
   ssize_t
     i;
 
-  /*
-    Allocate delegate list.
-  */
   assert(number_delegates != (size_t *) NULL);
   assert(pattern != (char *) NULL);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",pattern);
   *number_delegates=0;
-  p=GetDelegateInfo("*","*",exception);
-  if (p == (const DelegateInfo *) NULL)
+  if (IsDelegateCacheInstantiated(exception) == MagickFalse)
     return((const DelegateInfo **) NULL);
   delegates=(const DelegateInfo **) AcquireQuantumMemory((size_t)
     GetNumberOfElementsInLinkedList(delegate_cache)+1UL,sizeof(*delegates));
   if (delegates == (const DelegateInfo **) NULL)
     return((const DelegateInfo **) NULL);
-  /*
-    Generate delegate list.
-  */
   LockSemaphoreInfo(delegate_semaphore);
-  ResetLinkedListIterator(delegate_cache);
-  p=(const DelegateInfo *) GetNextValueInLinkedList(delegate_cache);
-  for (i=0; p != (const DelegateInfo *) NULL; )
+  p=GetHeadElementInLinkedList(delegate_cache);
+  for (i=0; p != (ElementInfo *) NULL; )
   {
-    if( (p->stealth == MagickFalse) &&
-        ( GlobExpression(p->decode,pattern,MagickFalse) != MagickFalse ||
-          GlobExpression(p->encode,pattern,MagickFalse) != MagickFalse) )
-      delegates[i++]=p;
-    p=(const DelegateInfo *) GetNextValueInLinkedList(delegate_cache);
+    const DelegateInfo
+      *delegate_info;
+
+    delegate_info=(const DelegateInfo *) p->value;
+    if( (delegate_info->stealth == MagickFalse) &&
+        (GlobExpression(delegate_info->decode,pattern,MagickFalse) != MagickFalse ||
+         GlobExpression(delegate_info->encode,pattern,MagickFalse) != MagickFalse))
+      delegates[i++]=delegate_info;
+    p=p->next;
   }
   UnlockSemaphoreInfo(delegate_semaphore);
-  qsort((void *) delegates,(size_t) i,sizeof(*delegates),DelegateInfoCompare);
-  delegates[i]=(DelegateInfo *) NULL;
+  if (i == 0)
+    delegates=(const DelegateInfo **) RelinquishMagickMemory((void*) delegates);
+  else
+    {
+      qsort((void *) delegates,(size_t) i,sizeof(*delegates),DelegateInfoCompare);
+      delegates[i]=(DelegateInfo *) NULL;
+    }
   *number_delegates=(size_t) i;
   return(delegates);
 }
@@ -1439,43 +1446,47 @@ MagickExport char **GetDelegateList(const char *pattern,
   char
     **delegates;
 
-  const DelegateInfo
+  ElementInfo
     *p;
 
   ssize_t
     i;
 
-  /*
-    Allocate delegate list.
-  */
   assert(pattern != (char *) NULL);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",pattern);
   assert(number_delegates != (size_t *) NULL);
   *number_delegates=0;
-  p=GetDelegateInfo("*","*",exception);
-  if (p == (const DelegateInfo *) NULL)
+  if (IsDelegateCacheInstantiated(exception) == MagickFalse)
     return((char **) NULL);
   delegates=(char **) AcquireQuantumMemory((size_t)
     GetNumberOfElementsInLinkedList(delegate_cache)+1UL,sizeof(*delegates));
   if (delegates == (char **) NULL)
     return((char **) NULL);
   LockSemaphoreInfo(delegate_semaphore);
-  ResetLinkedListIterator(delegate_cache);
-  p=(const DelegateInfo *) GetNextValueInLinkedList(delegate_cache);
-  for (i=0; p != (const DelegateInfo *) NULL; )
+  p=GetHeadElementInLinkedList(delegate_cache);
+  for (i=0; p != (ElementInfo *) NULL; )
   {
-    if( (p->stealth == MagickFalse) &&
-        GlobExpression(p->decode,pattern,MagickFalse) != MagickFalse )
-      delegates[i++]=ConstantString(p->decode);
-    if( (p->stealth == MagickFalse) &&
-        GlobExpression(p->encode,pattern,MagickFalse) != MagickFalse )
-      delegates[i++]=ConstantString(p->encode);
-    p=(const DelegateInfo *) GetNextValueInLinkedList(delegate_cache);
+    const DelegateInfo
+      *delegate_info;
+
+    delegate_info=(const DelegateInfo *) p->value;
+    if ((delegate_info->stealth == MagickFalse) &&
+       (GlobExpression(delegate_info->decode,pattern,MagickFalse) != MagickFalse))
+      delegates[i++]=ConstantString(delegate_info->decode);
+    if ((delegate_info->stealth == MagickFalse) &&
+        (GlobExpression(delegate_info->encode,pattern,MagickFalse) != MagickFalse))
+      delegates[i++]=ConstantString(delegate_info->encode);
+    p=p->next;
   }
   UnlockSemaphoreInfo(delegate_semaphore);
-  qsort((void *) delegates,(size_t) i,sizeof(*delegates),DelegateCompare);
-  delegates[i]=(char *) NULL;
+  if (i == 0)
+    delegates=(char **) RelinquishMagickMemory(delegates);
+  else
+    {
+      qsort((void *) delegates,(size_t) i,sizeof(*delegates),DelegateCompare);
+      delegates[i]=(char *) NULL;
+    }
   *number_delegates=(size_t) i;
   return(delegates);
 }
@@ -1622,15 +1633,13 @@ static MagickBooleanType CopyDelegateFile(const char *source,
   MagickBooleanType
     status;
 
-  size_t
+  ssize_t
+    count,
     i;
 
   size_t
     length,
     quantum;
-
-  ssize_t
-    count;
 
   struct stat
     attributes;
@@ -1669,7 +1678,7 @@ static MagickBooleanType CopyDelegateFile(const char *source,
       return(MagickFalse);
     }
   length=0;
-  for (i=0; ; i+=count)
+  for (i=0; ; i+=(ssize_t) count)
   {
     count=(ssize_t) read(source_file,buffer,quantum);
     if (count <= 0)
@@ -1733,7 +1742,7 @@ MagickExport MagickBooleanType InvokeDelegate(ImageInfo *image_info,
         "NotAuthorized","`%s'",encode);
       return(MagickFalse);
     }
-  temporary=*image->filename == '\0' ? MagickTrue : MagickFalse;
+  temporary=(*image->filename == '\0') ? MagickTrue : MagickFalse;
   if ((temporary != MagickFalse) && (AcquireUniqueFilename(image->filename) ==
       MagickFalse))
     {
@@ -2000,7 +2009,7 @@ MagickExport MagickBooleanType ListDelegateInfo(FILE *file,
       (void) CopyMagickString(delegate,delegate_info[i]->encode,
         MagickPathExtent);
     (void) ConcatenateMagickString(delegate,"        ",MagickPathExtent);
-    delegate[8]='\0';
+    delegate[9]='\0';
     commands=StringToList(delegate_info[i]->commands);
     if (commands == (char **) NULL)
       continue;
@@ -2147,8 +2156,8 @@ static MagickBooleanType LoadDelegateCache(LinkedListInfo *cache,
                   file_xml=FileToXML(path,~0UL);
                   if (file_xml != (char *) NULL)
                     {
-                      status&=LoadDelegateCache(cache,file_xml,path,
-                        depth+1,exception);
+                      status&=(MagickStatusType) LoadDelegateCache(cache,
+                        file_xml,path,depth+1,exception);
                       file_xml=DestroyString(file_xml);
                     }
                 }
@@ -2209,10 +2218,9 @@ static MagickBooleanType LoadDelegateCache(LinkedListInfo *cache,
                   path);
                 (void) SubstituteString((char **) &commands,"\\","/");
               }
-            (void) SubstituteString((char **) &commands,"&quot;","\"");
-#else
-            (void) SubstituteString((char **) &commands,"&quot;","'");
 #endif
+            (void) SubstituteString((char **) &commands,"&quot;","\"");
+            (void) SubstituteString((char **) &commands,"&apos;","'");
             (void) SubstituteString((char **) &commands,"&amp;","&");
             (void) SubstituteString((char **) &commands,"&gt;",">");
             (void) SubstituteString((char **) &commands,"&lt;","<");

@@ -1,5 +1,5 @@
 /*
-  Copyright @ 2019 ImageMagick Studio LLC, a non-profit organization
+  Copyright @ 1999 ImageMagick Studio LLC, a non-profit organization
   dedicated to making software imaging solutions freely available.
 
   You may not use this file except in compliance with the License.  You may
@@ -16,6 +16,7 @@
 #ifndef MAGICK_GHOSTSCRIPT_BUFFER_PRIVATE_H
 #define MAGICK_GHOSTSCRIPT_BUFFER_PRIVATE_H
 
+#include "MagickCore/profile-private.h"
 #include "coders/bytebuffer-private.h"
 
 #if defined(MAGICKCORE_GS_DELEGATE) || defined(MAGICKCORE_WINDOWS_SUPPORT)
@@ -218,7 +219,7 @@ static MagickBooleanType IsGhostscriptRendered(const char *path)
 }
 
 static inline void ReadGhostScriptXMPProfile(MagickByteBuffer *buffer,
-  StringInfo **profile)
+  StringInfo **profile,ExceptionInfo *exception)
 {
 #define BeginXMPPacket  "?xpacket begin="
 #define EndXMPPacket  "<?xpacket end="
@@ -239,13 +240,15 @@ static inline void ReadGhostScriptXMPProfile(MagickByteBuffer *buffer,
   ssize_t
     count;
 
-  if (*profile != (StringInfo *) NULL)
-    return;
   status=CompareMagickByteBuffer(buffer,BeginXMPPacket,strlen(BeginXMPPacket));
   if (status == MagickFalse)
     return;
+  if (*profile != (StringInfo *) NULL)
+    *profile=DestroyStringInfo(*profile);
   length=8192;
-  *profile=AcquireStringInfo(length);
+  *profile=AcquireProfileStringInfo("xmp",length,exception);
+  if (*profile == (StringInfo *) NULL)
+    return;
   found_end=MagickFalse;
   p=(char *) GetStringInfoDatum(*profile);
   *p++='<';

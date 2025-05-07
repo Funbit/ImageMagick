@@ -17,7 +17,7 @@
 %                               August 2013                                   %
 %                                                                             %
 %                                                                             %
-%  Copyright @ 2013 ImageMagick Studio LLC, a non-profit organization         %
+%  Copyright @ 1999 ImageMagick Studio LLC, a non-profit organization         %
 %  dedicated to making software imaging solutions freely available.           %
 %                                                                             %
 %  You may not use this file except in compliance with the License.  You may  %
@@ -204,7 +204,7 @@ static Image *ReadRGFImage(const ImageInfo *image_info,ExceptionInfo *exception)
       byte>>=1;
       if (bit == 8)
         bit=0;
-      q+=GetPixelChannels(image);
+      q+=(ptrdiff_t) GetPixelChannels(image);
     }
     if (SyncAuthenticPixels(image,exception) == MagickFalse)
       break;
@@ -215,7 +215,10 @@ static Image *ReadRGFImage(const ImageInfo *image_info,ExceptionInfo *exception)
   }
   data=(unsigned char *) RelinquishMagickMemory(data);
   (void) SyncImage(image,exception);
-  (void) CloseBlob(image);
+  if (CloseBlob(image) == MagickFalse)
+    status=MagickFalse;
+  if (status == MagickFalse)
+    return(DestroyImageList(image));
   return(GetFirstImageInList(image));
 }
 
@@ -366,7 +369,7 @@ static MagickBooleanType WriteRGFImage(const ImageInfo *image_info,Image *image,
     for (x=0; x < (ssize_t) image->columns; x++)
     {
       byte>>=1;
-      if (GetPixelLuma(image,p) < (QuantumRange/2.0))
+      if (GetPixelLuma(image,p) < ((double) QuantumRange/2.0))
         byte|=0x80;
       bit++;
       if (bit == 8)
@@ -378,7 +381,7 @@ static MagickBooleanType WriteRGFImage(const ImageInfo *image_info,Image *image,
           bit=0;
           byte=0;
         }
-      p+=GetPixelChannels(image);
+      p+=(ptrdiff_t) GetPixelChannels(image);
     }
     if (bit != 0)
     {
@@ -390,6 +393,7 @@ static MagickBooleanType WriteRGFImage(const ImageInfo *image_info,Image *image,
     if (status == MagickFalse)
       break;
   }
-  (void) CloseBlob(image);
-  return(MagickTrue);
+  if (CloseBlob(image) == MagickFalse)
+    status=MagickFalse;
+  return(status);
 }

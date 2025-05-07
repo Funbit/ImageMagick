@@ -115,7 +115,7 @@ AC_SUBST([MAGICKPP_LIBRARY_VERSION_INFO],
 AC_SUBST([PACKAGE_BASE_VERSION],[magick_base_version])
 AC_SUBST([PACKAGE_PATCHLEVEL_VERSION],[magick_patchlevel_version])
 if test "magick_is_beta" = 'y'; then
-  PACKAGE_VERSION_ADDENDUM='-magick_patchlevel_version beta'
+  PACKAGE_VERSION_ADDENDUM='-magick_patchlevel_version (Beta)'
 else
   PACKAGE_VERSION_ADDENDUM=-magick_patchlevel_version
 fi
@@ -269,6 +269,7 @@ AC_USE_SYSTEM_EXTENSIONS
 # ==============================================================================
 m4_ifdef([AM_PROG_AR], [AM_PROG_AR])
 AC_PROG_CC
+AC_PROG_CXX
 AC_PROG_CPP
 LT_PATH_LD
 AC_SUBST([LD])
@@ -395,7 +396,7 @@ case "$host" in
     if test "${build_osxuniversal}" != no ; then
       if test "$enable_dependency_tracking" != no ; then
         AC_MSG_ERROR([--enable-osx-universal-binary requires --disable-dependency-tracking.
-Please re-run configure with these options:
+Re-run configure with these options:
   --disable-dependency-tracking --enable-osx-universal-binary
         ])
       fi
@@ -410,8 +411,8 @@ esac
 # ARCH specific include directory
 #
 AC_ARG_WITH([includearch-dir],
-    [AS_HELP_STRING([--includearch-dir=DIR],
-                    [ARCH specific include directory])],
+    [AS_HELP_STRING([--with-includearch-dir=DIR],
+                    [ARCH specific include directory @<:@INCLUDEDIR@:>@])],
                     [includearch_dir=$withval],
                     [includearch_dir=$INCLUDE_DIR])
 
@@ -422,8 +423,8 @@ AC_SUBST([INCLUDEARCH_DIR])
 # ARCH specific configuration directory
 #
 AC_ARG_WITH([sharearch-dir],
-    [AS_HELP_STRING([--sharearch-dir=DIR],
-                    [ARCH specific config directory])],
+    [AS_HELP_STRING([--with-sharearch-dir=DIR],
+                    [ARCH specific config directory @<:@LIBDIR@:>@])],
                     [sharearch_dir=$withval],
                     [sharearch_dir="${LIB_DIR}"])
 
@@ -467,21 +468,22 @@ AC_SUBST([THREAD_LIBS])
 # Enable support for OpenMP
 if test "$have_threads" != 'yes'; then
   ac_cv_prog_c_openmp=unsupported
-fi
+fi  
 AC_OPENMP([C])
 CFLAGS="$OPENMP_CFLAGS $CFLAGS"
 MAGICK_PCFLAGS="$MAGICK_PCFLAGS $OPENMP_CFLAGS"
 AC_SUBST([OPENMP_CFLAGS])
-if test "$enable_openmp" != no; then
-  if test "$ac_cv_prog_c_openmp" != 'unsupported'; then
+AC_CHECK_DECL([_OPENMP],[OPENMP_ENABLED='yes'],[OPENMP_ENABLED='no'],[])
+if test "${OPENMP_ENABLED}" = 'yes' && \
+   test "$ac_cv_prog_c_openmp" != 'unsupported'; then
     MAGICK_FEATURES="OpenMP $MAGICK_FEATURES"
-  fi
 fi
 
 # Enable support for OpenCL
 no_cl=yes
 AX_HAVE_OPENCL([C])
 if test "X$no_cl" != 'Xyes'; then
+  CPPFLAGS="$CL_CPPFLAGS $CPPFLAGS"
   MAGICK_FEATURES="OpenCL $MAGICK_FEATURES"
 fi
 
@@ -501,7 +503,8 @@ if test "$enable_largefile" != no; then
     unknown)
         AC_MSG_CHECKING([for native large file support])
         AC_RUN_IFELSE([AC_LANG_PROGRAM([#include <unistd.h>
-          main () {
+          #include <stdlib.h>
+          int main () {
           exit(!(sizeof(off_t) == 8));
         }])],
         [ac_cv_sys_file_offset_bits=64; AC_DEFINE(_FILE_OFFSET_BITS,64)
@@ -509,6 +512,9 @@ if test "$enable_largefile" != no; then
         [AC_MSG_RESULT([no])])
         ;;
     *)
+        if test "$ac_cv_sys_file_offset_bits" = ''; then
+            ac_cv_sys_file_offset_bits=64;
+        fi
         LFS_CPPFLAGS="$LFS_CPPFLAGS -D_FILE_OFFSET_BITS=$ac_cv_sys_file_offset_bits"
         ;;
     esac
@@ -590,12 +596,12 @@ if test "$with_modules" != 'no' ; then
 fi
 if test "$build_modules" != 'no' ; then
     AC_DEFINE([BUILD_MODULES],[1],[Define if coders and filters are to be built as modules.])
-    MAGICK_FEATURES="$MAGICK_FEATURES Modules"
+    MAGICK_FEATURES="Modules $MAGICK_FEATURES"
 fi
 AM_CONDITIONAL([WITH_MODULES],[test "$build_modules" != 'no'])
 
 # Enable build using delegate libraries built in subdirectories rather than installed
-# delegate libraries (bzlib fftw fpx gslib jp2 jbig jpeg lcms lzma png tiff ttf wmf xml zlib zip)
+# delegate libraries (bzlib fftw fpx gslib jp2 jbig jpeg lcms lzma png tiff ttf uhdr wmf xml zlib zip)
 AC_ARG_ENABLE([delegate-build],
     [AS_HELP_STRING([--enable-delegate-build],
                     [look for delegate libraries in build directory])],
@@ -628,18 +634,6 @@ else
     DISTCHECK_CONFIG_FLAGS="${DISTCHECK_CONFIG_FLAGS} --disable-installed "
 fi
 
-# Permit enciphering and deciphering image pixels.
-AC_ARG_ENABLE([cipher],
-    [AS_HELP_STRING([--disable-cipher],
-                    [disable enciphering and deciphering image pixels])],
-    [enable_cipher=$enableval],
-    [enable_cipher='yes'])
-
-if test "$enable_cipher" = 'yes'; then
-    AC_DEFINE([CIPHER_SUPPORT],[1],[permit enciphering and deciphering image pixels])
-    MAGICK_FEATURES="Cipher $MAGICK_FEATURES"
-fi
-
 # Build a zero-configuration version of ImageMagick.
 AC_ARG_ENABLE([zero-configuration],
     [AS_HELP_STRING([--enable-zero-configuration],
@@ -653,7 +647,9 @@ if test "$enable_zero_configuration" = 'yes'; then
 fi
 AM_CONDITIONAL([MAGICKCORE_ZERO_CONFIGURATION_SUPPORT],[test "$enable_zero_configuration" = yes])
 
+#
 # Build a high dynamic range version of ImageMagick.
+#
 AC_ARG_ENABLE([hdri],
     [AS_HELP_STRING([--enable-hdri],
                     [accurately represent the wide range of intensity levels found in real scenes])],
@@ -668,16 +664,29 @@ if test "$enable_hdri" = 'yes'; then
 else
     magick_hdri_enable='0'
 fi
-AC_DEFINE_UNQUOTED([HDRI_ENABLE_OBSOLETE_IN_H],[$magick_hdri_enable],[Whether hdri is enabled or not])
 AC_SUBST([MAGICK_HDRI])dnl
 MAGICK_PCFLAGS="$MAGICK_PCFLAGS -DMAGICKCORE_HDRI_ENABLE=$magick_hdri_enable"
 CFLAGS="$CFLAGS -DMAGICKCORE_HDRI_ENABLE=$magick_hdri_enable"
 CPPFLAGS="$CPPFLAGS -DMAGICKCORE_HDRI_ENABLE=$magick_hdri_enable"
 
+#
+# Support the distributed pixel cache.
+#
+AC_ARG_ENABLE([dpc],
+    [AS_HELP_STRING([--disable-dpc],
+                    [disable distributed pixel cache support])],
+    [enable_dpc=$enableval],
+    [enable_dpc='yes'])
+
+if test "$enable_dpc" = 'yes'; then
+    AC_DEFINE([DPC_SUPPORT],[1],[Define to 1 to enable distributed pixel cache support.])
+    MAGICK_FEATURES="DPC $MAGICK_FEATURES"
+fi
+
 # Enable pipes (|) in filenames.
 AC_ARG_ENABLE([pipes],
     [AS_HELP_STRING([--enable-pipes],
-                    [enable pipes (|) in filenames])],
+                    [enable pipes (|) in filenames. Be sure to properly validate and sanitize user input to prevent malicious behaviors.])],
     [enable_pipes=$enableval],
     [enable_pipes='no'])
 
@@ -800,14 +809,40 @@ AC_SUBST([MAGICK_ABI_SUFFIX])
 # Set pixel cache threshold
 AC_ARG_WITH([cache],
     [AS_HELP_STRING([--with-cache=THRESHOLD],
-                    [set pixel cache threshhold in MB (default available memory)])],
+                    [set pixel cache memory threshold (default available memory)])],
     [with_cache=$withval],
     [with_cache=''])
 
 if test "$with_cache" != ''; then
-    AC_DEFINE_UNQUOTED([PixelCacheThreshold],["$with_cache"],[Pixel cache threshold in MB (defaults to available memory)])
+    AC_DEFINE_UNQUOTED([PixelCacheThreshold],["$with_cache"],[Pixel cache memory threshold (defaults to available memory)])
     DISTCHECK_CONFIG_FLAGS="${DISTCHECK_CONFIG_FLAGS} --with-cache=$with_cache "
 fi
+
+# Set security policy
+security_policy="open"
+m4_define([_MAGICK_SECURITY_POLICY],
+[m4_define([MAGICK_SECURITY_POLICY_DEFAULT], [m4_if($1, limited, limited, m4_if($1, secure, secure, open))])dnl
+  AC_MSG_CHECKING([which variant of security policy to enforce])
+  AC_ARG_WITH([security-policy],
+    [AS_HELP_STRING([--with-security-policy=open|limited|secure|websafe],
+      [security policy variant to enforce, @<:@default=]MAGICK_SECURITY_POLICY_DEFAULT[@:>@.])],
+    [case $withval in
+    open|limited|secure|websafe)
+      security_policy=$withval
+      ;;
+    *)
+      AC_MSG_ERROR([Unknown argument to --with-security-policy])
+      ;;
+    esac
+    magick_cv_with_security_policy=$security_policy],
+    [AC_CACHE_VAL([magick_cv_with_security_policy],
+      [magick_cv_with_security_policy=]MAGICK_SECURITY_POLICY_DEFAULT)
+    MAGICK_SECURITY_POLICY=$magick_cv_with_security_policy])
+  AC_MSG_RESULT([$security_policy])
+]) # MAGICK_SECURITY_POLICY
+
+_MAGICK_SECURITY_POLICY([open])
+AC_SUBST([MAGICK_SECURITY_POLICY])
 
 # Disable/Enable support for full delegate paths
 AC_ARG_WITH([frozenpaths],
@@ -853,6 +888,16 @@ if test "$with_jemalloc" != 'yes' ; then
     DISTCHECK_CONFIG_FLAGS="${DISTCHECK_CONFIG_FLAGS} --with-jemalloc=$with_jemalloc "
 fi
 
+# Enable use of MTMalloc library.
+AC_ARG_WITH([mtmalloc],
+   AS_HELP_STRING([--with-mtmalloc],
+                  [enable mtmalloc memory allocation library support]),
+   [with_mtmalloc=$withval],
+   [with_mtmalloc='no'])
+if test "$with_mtmalloc" != 'no' ; then
+   DISTCHECK_CONFIG_FLAGS="${DISTCHECK_CONFIG_FLAGS} --with-mtmalloc=$with_mtmalloc "
+fi
+
 # Enable use of TCMalloc library.
 AC_ARG_WITH([tcmalloc],
    AS_HELP_STRING([--with-tcmalloc],
@@ -887,9 +932,6 @@ if test "$with_libstdc" != ''; then
     fi
 fi
 AC_SUBST([LIBSTDCLDFLAGS])
-
-# Does gcc required -traditional?
-AC_PROG_GCC_TRADITIONAL
 
 ########
 #
@@ -932,7 +974,7 @@ AC_HEADER_ASSERT
 AC_HEADER_DIRENT
 
 # Check additional headers
-AC_CHECK_HEADERS(arm/limits.h arpa/inet.h complex.h errno.h fcntl.h float.h limits.h linux/unistd.h locale.h machine/param.h mach-o/dyld.h malloc.h netdb.h netinet/in.h OS.h process.h sun_prefetch.h stdarg.h stddef.h sys/ipc.h sys/mman.h sys/resource.h sys/sendfile.h sys/socket.h sys/syslimits.h sys/time.h sys/times.h sys/uio.h sys/wait.h utime.h wchar.h xlocale.h)
+AC_CHECK_HEADERS(arm/limits.h arpa/inet.h complex.h errno.h fcntl.h float.h inttypes.h limits.h linux/unistd.h locale.h machine/param.h mach-o/dyld.h malloc.h netdb.h netinet/in.h OS.h process.h sun_prefetch.h stdarg.h stddef.h stdint.h strings.h sys/ipc.h sys/mman.h sys/resource.h sys/sendfile.h sys/socket.h sys/syslimits.h sys/time.h sys/times.h sys/uio.h unistd.h sys/wait.h utime.h wchar.h xlocale.h)
 
 ########
 #
@@ -982,11 +1024,11 @@ AC_TYPE_UINT64_T
 AC_TYPE_UINTMAX_T
 AC_TYPE_UINTPTR_T
 
-# Float_t and double_t are intended to be the the most efficient type.
+# Float_t and double_t are intended to be the most efficient type.
 AC_CHECK_SIZEOF([float_t], [], [[#include <math.h>]])
 AC_CHECK_SIZEOF([double_t], [], [[#include <math.h>]])
 
-# Get size of float, double and long double for comparaison.
+# Get size of float, double and long double for comparison.
 AC_CHECK_SIZEOF([float])
 AC_CHECK_SIZEOF([double])
 AC_CHECK_SIZEOF([long double])
@@ -995,7 +1037,7 @@ AC_CHECK_SIZEOF([long double])
 # SIZEOF_UNSIGNED_LONG_LONG.  If 'unsigned long long' is not
 # supported then the value defined is zero.
 AC_CHECK_SIZEOF([unsigned long long])
-AC_CHECK_SIZEOF([ssize_t])
+AC_CHECK_SIZEOF([size_t])
 
 AC_CHECK_SIZEOF([void *])
 
@@ -1023,16 +1065,9 @@ AC_COMPILE_IFELSE([AC_LANG_PROGRAM([],
 # Check for functions
 #
 ########
-AC_FUNC_CLOSEDIR_VOID
 AC_FUNC_MMAP
-AC_FUNC_FORK
-AC_FUNC_MALLOC
-AC_FUNC_MEMCMP
-AC_FUNC_REALLOC
-AC_FUNC_SELECT_ARGTYPES
 AC_FUNC_STRTOD
 AC_FUNC_STRERROR_R
-AC_FUNC_VPRINTF
 
 #
 # Find math library
@@ -1049,7 +1084,6 @@ AC_SEARCH_LIBS(gethostbyname, resolv nsl)
 AC_SEARCH_LIBS(socket, socket,
 [
   AC_DEFINE([HAVE_SOCKET],[1],[Define to 1 if you have socket support.])
-  MAGICK_FEATURES="DPC $MAGICK_FEATURES"
 ])
 
 #
@@ -1140,7 +1174,7 @@ if test "$enable_delegate_build" != 'no'; then
     # Most delegates have includes in the same directory as the library, but not all...
     #
     # Includes
-    for dir in bzlib fftw fpx gslib/src jp2 jbig/libjbig jpeg lcms/include lzma magick openjp2/include png tiff/libtiff ttf/include wand webp/src wmf/include xml/include zlib zip; do
+    for dir in bzlib fftw fpx gslib/src jp2 jbig/libjbig jpeg lcms/include lzma magick openjp2/include png tiff/libtiff ttf/include uhdr wand webp/src wmf/include xml/include zlib zip; do
         if test -d "$builddir/$dir"; then
             CPPFLAGS="$CPPFLAGS -I$builddir/$dir"
         else
@@ -1151,7 +1185,7 @@ if test "$enable_delegate_build" != 'no'; then
     done
 
     # Libraries
-    for dir in bzlib fftw fpx gslib/src jbig/libjbig jpeg lcms/src lzma magick openjp2 png tiff/libtiff ttf/objs wand webp wmf/src xml zlib zip; do
+    for dir in bzlib fftw fpx gslib/src jbig/libjbig jpeg lcms/src lzma magick openjp2 png tiff/libtiff ttf/objs uhdr wand webp wmf/src xml zlib zip; do
     if test -d "$builddir/$dir/.libs"; then
         LDFLAGS="$LDFLAGS -L$builddir/$dir/.libs"
     else
@@ -1233,39 +1267,51 @@ AC_DEFINE_UNQUOTED([X11_CONFIGURE_PATH],["$X11ConfigurePath"],[Location of X11 c
 # Find OpenMP library
 #
 GOMP_LIBS=''
-if test "$enable_openmp" != 'no'; then
+if test "${OPENMP_ENABLED}" = 'yes'; then
+  AC_CHECK_HEADER([omp.h], [], [AC_MSG_RESULT([OpenMP header file not found])])
   if test "${GCC}" = "yes"; then
     # Open64 (passes for GCC but uses different OpenMP implementation)
     if test "x$GOMP_LIBS" = x ; then
       if $CC --version 2>&1 | grep Open64 > /dev/null ; then
-        AC_CHECK_LIB([openmp],[omp_get_num_procs],[GOMP_LIBS="-lopenmp"],[],[])
+        AC_COMPILE_IFELSE([ AC_LANG_PROGRAM([#include <omp.h>], [
+          omp_set_num_threads(1);])],[GOMP_LIBS="-lopenmp"],[])
       fi
     fi
     # Clang (passes for GCC but uses different OpenMP implementation)
-    if test "x$LIB_OMP" = x ; then
+    if test "x$GOMP_LIBS" = x ; then
       if $CC --version 2>&1 | grep clang > /dev/null ; then
-        AC_CHECK_LIB([omp],[GOMP_parallel_start],[LIB_OMP="-lomp"],[],[])
+        AC_COMPILE_IFELSE([ AC_LANG_PROGRAM([#include <omp.h>], [
+          omp_set_num_threads(1);])],[GOMP_LIBS="-lomp"],[])
       fi
     fi
     # GCC
     if test "x$GOMP_LIBS" = x ; then
-      AC_CHECK_LIB([gomp],[GOMP_parallel_start],[GOMP_LIBS="-lgomp"],[],[])
+      AC_COMPILE_IFELSE([ AC_LANG_PROGRAM([#include <omp.h>], [
+        omp_set_num_threads(1);])],[GOMP_LIBS="-lgomp"],[])
     fi
   else
     # Sun CC
     if test "x$GOMP_LIBS" = x ; then
-      AC_CHECK_LIB([mtsk],[sunw_mp_register_warn],[GOMP_LIBS="-lmtsk"],[],[])
+      AC_COMPILE_IFELSE([ AC_LANG_PROGRAM([#include <omp.h>], [
+        omp_set_num_threads(1);])],[GOMP_LIBS="-lmtsk"],[])
     fi
     # AIX xlc
     if test "x$GOMP_LIBS" = x ; then
-    AC_CHECK_LIB([xlsmp],[_xlsmpFlush],[GOMP_LIBS="-lxlsmp"],[],[])
+      AC_COMPILE_IFELSE([ AC_LANG_PROGRAM([#include <omp.h>], [
+        omp_set_num_threads(1);])],[GOMP_LIBS="-lxmlsmp"],[])
     fi
     # SGI IRIX 6.5 MIPSpro C/C++
     if test "x$GOMP_LIBS" = x ; then
-    AC_CHECK_LIB([mp],[mp_destroy],[GOMP_LIBS="-lmp"],[],[])
+      AC_COMPILE_IFELSE([ AC_LANG_PROGRAM([#include <omp.h>], [
+        omp_set_num_threads(1);])],[GOMP_LIBS="-lmp"],[])
     fi
   fi
-  LIBS="$GOMP_LIBS $LIBS"
+  AC_MSG_CHECKING([for OpenMP library ])
+  if test "x$GOMP_LIBS" = x ; then
+    AC_MSG_RESULT([not found!])
+  else
+    AC_MSG_RESULT([${GOMP_LIBS}])
+  fi
 fi
 AC_SUBST([GOMP_LIBS])
 
@@ -1299,6 +1345,38 @@ if test "$with_jemalloc" != 'no'; then
 fi
 AM_CONDITIONAL([HAVE_JEMALLOC],[test "$have_jemalloc" = 'yes'])
 AC_SUBST([JEMALLOC_LIBS])
+
+#
+# Check for MTMalloc library
+#
+have_mtmalloc='no'
+MTMALLOC_LIBS=''
+OLIBS="$LIBS"
+if test "$have_threads" = 'yes' -a "$with_mtmalloc" != 'no'; then
+    AC_MSG_CHECKING([mtmalloc library support])
+    AC_MSG_RESULT([])
+    failed=0
+    passed=0
+
+    AC_CHECK_HEADER([mtmalloc.h],[passed=`expr $passed + 1`],[failed=`expr $failed + 1`],[])
+    AC_CHECK_LIB([mtalloc],[mallocctl],[passed=`expr $passed + 1`],[failed=`expr $failed + 1`],[])
+
+    if test $passed -gt 0; then
+        if test $failed -gt 0; then
+            have_mtmalloc='no (some components failed test)'
+        else
+            MTMALLOC_LIBS=-lmtalloc
+            LIBS="$MTMALLOC_LIBS $LIBS"
+            CFLAGS="$CFLAGS -fno-builtin-malloc -fno-builtin-calloc -fno-builtin-realloc -fno-builtin-free"
+            AC_DEFINE([HAVE_MTMALLOC],[1],[Define if you have the mtmalloc memory allocation library])
+            have_mtmalloc='yes'
+        fi
+    fi
+    AC_MSG_CHECKING([if mtmalloc memory allocation library is complete])
+    AC_MSG_RESULT([$have_mtmalloc])
+fi
+AM_CONDITIONAL([HAVE_MTMALLOC],[test "$have_mtmalloc" = 'yes'])
+AC_SUBST([MTMALLOC_LIBS])
 
 #
 # Check for TCMalloc library
@@ -1427,6 +1505,11 @@ if test "$with_bzlib" != 'no'; then
   failed=0
   passed=0
   found_libbz=0
+
+  PKG_CHECK_MODULES([BZLIB],[bzip2 >= 1.0.0],[have_bzlib=yes],[have_bzlib=no])
+  CFLAGS="$CFLAGS $BZLIB_CFLAGS"
+  LIBS="$LIBS $BZLIB_LIBS"
+
   AC_CHECK_HEADER([bzlib.h],[passed=`expr $passed + 1`],[failed=`expr $failed + 1`])
   AC_CHECK_LIB([bz2],[BZ2_bzDecompress],[found_libbz=`expr $found_libbz + 1`],,)
   if test "$native_win32_build" = 'yes'; then
@@ -1455,6 +1538,7 @@ if test "$with_bzlib" != 'no'; then
 fi
 AM_CONDITIONAL([BZLIB_DELEGATE],[test "$have_bzlib" = 'yes'])
 AC_SUBST([BZLIB_LIBS])
+AC_SUBST([BZLIB_CFLAGS])
 
 #
 # Find the X11 include and library directories.
@@ -1629,7 +1713,13 @@ if test "$with_ltdl" = 'yes'; then
   failed=0
   passed=0
   AC_CHECK_HEADER([ltdl.h],[passed=`expr $passed + 1`],[failed=`expr $failed + 1`])
-  AC_CHECK_LIB([ltdl],[lt_dlinit],[passed=`expr $passed + 1`],[failed=`expr $failed + 1`],[])
+  AC_COMPILE_IFELSE([
+    AC_LANG_PROGRAM([[
+      #include <ltdl.h>
+    ]], [[
+      lt_dlinit();
+    ]])
+  ], [passed=`expr $passed + 1`], [failed=`expr $failed + 1`])
   AC_MSG_CHECKING([if libltdl package is complete])
   if test $passed -gt 0 ; then
     if test $failed -gt 0 ; then
@@ -1717,10 +1807,10 @@ dnl ===========================================================================
 # Check for Display Postscript delegate library.
 #
 AC_ARG_WITH([dps],
-    [AS_HELP_STRING([--without-dps],
-                    [disable Display Postscript support])],
+    [AS_HELP_STRING([--with-dps],
+                    [enable Display Postscript support])],
     [with_dps=$withval],
-    [with_dps='yes'])
+    [with_dps='no'])
 
 if test "$with_dps" != 'yes'; then
     DISTCHECK_CONFIG_FLAGS="${DISTCHECK_CONFIG_FLAGS} --with-dps=$with_dps "
@@ -1881,10 +1971,10 @@ dnl ===========================================================================
 # Check for FlashPIX delegate library.
 #
 AC_ARG_WITH([fpx],
-    [AS_HELP_STRING([--without-fpx],
-                    [disable FlashPIX support])],
+    [AS_HELP_STRING([--with-fpx],
+                    [enable FlashPIX support])],
     [with_fpx=$withval],
-    [with_fpx='yes'])
+    [with_fpx='no'])
 
 if test "$with_fpx" != 'yes'; then
     DISTCHECK_CONFIG_FLAGS="${DISTCHECK_CONFIG_FLAGS} --with-fpx=$with_fpx "
@@ -2233,6 +2323,41 @@ AC_SUBST([GVC_LIBS])
 dnl ===========================================================================
 
 #
+# Check for DMR, digital media repository, delegate library.
+#
+AC_ARG_WITH([dmr],
+    [AS_HELP_STRING([--without-dmr], [disable digital media repository support])],
+    [with_dmr=$withval],
+    [with_dmr='yes'])
+
+if test "$with_dmr" != 'yes'; then
+    DISTCHECK_CONFIG_FLAGS="${DISTCHECK_CONFIG_FLAGS} --with-dmr=$with_dmr "
+fi
+
+have_dmr='no'
+DMR_CFLAGS=""
+DMR_LIBS=""
+DMR_PKG=""
+if test "x$with_dmr" = "xyes"; then
+  AC_MSG_RESULT([-------------------------------------------------------------])
+  PKG_CHECK_MODULES([MagickCache],[MagickCache >= 0.9.3],[have_dmr=yes],[have_dmr=no])
+  AC_MSG_RESULT([])
+fi
+
+if test "$have_dmr" = 'yes'; then
+  AC_DEFINE([DMR_DELEGATE],[1],[Define if you have DMR library])
+  DMR_CFLAGS="$MagickCache_CFLAGS"
+  DMR_LIBS="$MagickCache_LIBS"
+  CFLAGS="$DMR_CFLAGS $CFLAGS"
+fi
+
+AM_CONDITIONAL([DMR_DELEGATE],[test "$have_dmr" = 'yes'])
+AC_SUBST([DMR_CFLAGS])
+AC_SUBST([DMR_LIBS])
+
+dnl ===========================================================================
+
+#
 # Check for the HEIC delegate library.
 #
 AC_ARG_WITH([heic],
@@ -2328,6 +2453,11 @@ if test "$with_jpeg" != 'no'; then
     AC_MSG_RESULT([])
     failed=0
     passed=0
+
+    PKG_CHECK_MODULES([JPEG],[libjpeg >= 2.0.0],[have_jpeg=yes],[have_jpeg=no])
+    CFLAGS="$CFLAGS $JPEG_CFLAGS"
+    LIBS="$LIBS $JPEG_LIBS"
+
     AC_CHECK_HEADER([jconfig.h],[passed=`expr $passed + 1`],[failed=`expr $failed + 1`])
     AC_CHECK_HEADER([jerror.h],[passed=`expr $passed + 1`],[failed=`expr $failed + 1`])
     AC_CHECK_HEADER([jmorecfg.h],[passed=`expr $passed + 1`],[failed=`expr $failed + 1`])
@@ -2346,11 +2476,13 @@ if test "$with_jpeg" != 'no'; then
             AC_MSG_RESULT([yes])
             have_jpeg='yes'
         fi
+        AC_CHECK_FUNCS([jpeg12_read_scanlines jpeg12_write_scanlines jpeg16_read_scanlines jpeg16_write_scanlines jpeg_enable_lossless jpeg_simple_lossless])
     else
         AC_MSG_RESULT([no])
     fi
 fi
 AM_CONDITIONAL([JPEG_DELEGATE],[test "$have_jpeg" = 'yes'])
+AC_SUBST([JPEG_CFLAGS])
 AC_SUBST([JPEG_LIBS])
 
 dnl ===========================================================================
@@ -2359,10 +2491,10 @@ dnl ===========================================================================
 # Check for JPEG-XL delegate library.
 #
 AC_ARG_WITH([jxl],
-    [AS_HELP_STRING([--with-jxl],
-                    [enable JPEG-XL support])],
+    [AS_HELP_STRING([--without-jxl],
+                    [disable JPEG-XL support])],
     [with_jxl=$withval],
-    [with_jxl='no'])
+    [with_jxl='yes'])
 
 # Check for the JPEG-XL library.
 have_jxl='no'
@@ -2371,7 +2503,7 @@ JXL_LIBS=''
 JXL_PKG=''
 if test "$with_jxl" != 'no'; then
   AC_MSG_RESULT([-------------------------------------------------------------])
-  PKG_CHECK_MODULES([JXL],[libjxl >= 0.6.1 libjxl_threads],[have_jxl=yes],[have_jxl=no])
+  PKG_CHECK_MODULES([JXL],[libjxl >= 0.7.0 libjxl_threads],[have_jxl=yes],[have_jxl=no])
   AC_MSG_RESULT([])
 fi
 
@@ -2583,17 +2715,11 @@ if test "x$with_pango" = "xyes"; then
   AC_MSG_RESULT([])
 fi
 
-if test "$have_pango" = 'yes'; then
-  AC_DEFINE([PANGO_DELEGATE],[1],[Define if you have PANGO library])
-  CFLAGS="$PANGO_CFLAGS $CFLAGS"
-fi
-
-if test "$have_pangocairo" = 'yes'; then
+if test "${have_pango}x${have_pangocairo}" = 'yesxyes'; then
   AC_DEFINE([PANGOCAIRO_DELEGATE],[1],[Define if you have PANGOCAIRO library])
-  CFLAGS="$PANGOCAIRO_CFLAGS $CFLAGS"
+  CFLAGS="$PANGO_CFLAGS $PANGOCAIRO_CFLAGS $CFLAGS"
 fi
 
-AM_CONDITIONAL([PANGO_DELEGATE],[test "$have_pango" = 'yes'])
 AM_CONDITIONAL([PANGOCAIRO_DELEGATE],[test "$have_pangocairo" = 'yes'])
 AC_SUBST([PANGO_CFLAGS])
 AC_SUBST([PANGO_LIBS])
@@ -2744,7 +2870,41 @@ AC_SUBST([TIFF_LIBS])
 dnl ===========================================================================
 
 #
-# Set URW Base35 font directory.
+# Check for google libultrahdr delegate library
+#
+AC_ARG_WITH([uhdr],
+    [AS_HELP_STRING([--with-uhdr],
+                    [enable google ultrahdr support])],
+    [with_uhdr=$withval],
+    [with_uhdr='no'])
+
+if test "$with_uhdr" != 'yes'; then
+    DISTCHECK_CONFIG_FLAGS="${DISTCHECK_CONFIG_FLAGS} --with-uhdr=$with_uhdr "
+fi
+
+have_uhdr='no'
+UHDR_CFLAGS=""
+UHDR_LIBS=""
+UHDR_PKG=""
+if test "$with_uhdr" != 'no'; then
+    AC_MSG_RESULT([-------------------------------------------------------------])
+    PKG_CHECK_MODULES([UHDR],[libuhdr >= 1.3.0],[have_uhdr=yes],[have_uhdr=no])
+    AC_MSG_RESULT([])
+fi
+
+if test "$have_uhdr" = 'yes'; then
+  AC_DEFINE([UHDR_DELEGATE],[1],[Define if you have google ultrahdr library])
+  CFLAGS="$UHDR_CFLAGS $CFLAGS"
+fi
+
+AM_CONDITIONAL([UHDR_DELEGATE],[test "$have_uhdr" = 'yes'])
+AC_SUBST([UHDR_CFLAGS])
+AC_SUBST([UHDR_LIBS])
+
+dnl ===========================================================================
+
+#
+# Set URW Base35 OTF font directory.
 #
 AC_ARG_WITH([urw-base35-font-dir],
     [AS_HELP_STRING([--with-urw-base35-font-dir=DIR],
@@ -2754,6 +2914,21 @@ AC_ARG_WITH([urw-base35-font-dir],
 
 if test "$with_urw_base35_font_dir" != 'default'; then
     DISTCHECK_CONFIG_FLAGS="${DISTCHECK_CONFIG_FLAGS} --with-urw-base35-font-dir=$with_urw_base35_font_dir "
+fi
+
+dnl ===========================================================================
+
+#
+# Set URW Base35 Type1 font directory.
+#
+AC_ARG_WITH([urw-base35-type1-font-dir],
+    [AS_HELP_STRING([--with-urw-base35-type1-font-dir=DIR],
+                    [URW-base35 font directory])],
+    [with_urw_base35_type1_font_dir=$withval],
+    [with_urw_base35_type1_font_dir='default'])
+
+if test "$with_urw_base35_type1_font_dir" != 'default'; then
+    DISTCHECK_CONFIG_FLAGS="${DISTCHECK_CONFIG_FLAGS} --with-urw-base35-type1-font-dir=$with_urw_base35_type1_font_dir "
 fi
 
 dnl ===========================================================================
@@ -2909,7 +3084,7 @@ dnl ===========================================================================
 
 # Check for functions
 #
-AC_CHECK_FUNCS([acosh _aligned_malloc aligned_malloc asinh atanh atoll atexit cabs carg cimag creal clock clock_getres clock_gettime ctime_r directio erf _exit execvp fchmod floor fork ftime ftruncate getc_unlocked getcwd getentropy getexecname getdtablesize getpagesize getpid getpwnam_r getrlimit getrusage gettimeofday gmtime_r isnan j0 j1 lltostr localtime_r lstat memmove memset mkdir mkstemp munmap nanosleep newlocale _NSGetExecutablePath pclose _pclose poll popen _popen posix_fadvise posix_fallocate posix_madvise posix_memalign posix_spawnp pow pread putenv pwrite qsort_r raise rand_r readlink realpath select seekdir sendfile setlocale socket sqrt setvbuf stat strcasestr strchr strrchr strcspn strdup strpbrk strspn strstr strtod strtod_l strtol strtoul symlink sysconf sigemptyset sigaction spawnvp strerror strlcat strlcpy strcasecmp strncasecmp system telldir tempnam times ulltostr uselocale usleep utime utimensat vfprintf vfprintf_l vsprintf vsnprintf vsnprintf_l waitpid _wfopen _wstat])
+AC_CHECK_FUNCS([acosh _aligned_malloc aligned_malloc asinh atanh atoll atexit cabs carg cimag creal clock clock_getres clock_gettime ctime_r directio erf _exit execvp fchmod floor fork ftime ftruncate getc_unlocked getcwd getentropy getexecname getdtablesize getpagesize getpid getpwnam_r getrlimit getrusage gettimeofday gmtime_r isnan j0 j1 lltostr localtime_r lstat memmove memset mkdir mkstemp mmap munmap nanosleep newlocale _NSGetExecutablePath pclose _pclose poll popen _popen posix_fadvise posix_fallocate posix_madvise posix_memalign posix_spawnp pow pread putenv pwrite qsort_r raise rand_r readlink realpath select seekdir sendfile setlocale socket sqrt setvbuf stat strcasestr strchr strrchr strcspn strdup strpbrk strspn strstr strtod strtod_l strtol strtoul symlink sysconf sigemptyset sigaction spawnvp strerror strlcat strlcpy strcasecmp strncasecmp system telldir tempnam times ulltostr uselocale usleep utime utimensat vfprintf vfprintf_l vsprintf vsnprintf vsnprintf_l waitpid _wfopen _wstat])
 
 # Substitute compiler name to build/link PerlMagick
 #
@@ -2958,15 +3133,15 @@ AC_DEFINE_UNQUOTED([EXECUTABLE_PATH],["$DEFINE_EXECUTABLE_PATH"],[Directory wher
 AC_SUBST([EXECUTABLE_PATH])
 
 # Path to ImageMagick lib
-LIBRARY_PATH="${LIB_DIR}/${LIBRARY_RELATIVE_PATH}"
-DEFINE_LIBRARY_PATH="${LIB_DIR}/${LIBRARY_RELATIVE_PATH}/"
+LIBRARY_ABSOLUTE_PATH="${LIB_DIR}/${LIBRARY_RELATIVE_PATH}"
+DEFINE_LIBRARY_ABSOLUTE_PATH="${LIB_DIR}/${LIBRARY_RELATIVE_PATH}/"
 case "${build_os}" in
   mingw* )
-    DEFINE_LIBRARY_PATH=`$WinPathScript "$DEFINE_LIBRARY_PATH" 1`
+    DEFINE_LIBRARY_ABSOLUTE_PATH=`$WinPathScript "$DEFINE_LIBRARY_ABSOLUTE_PATH" 1`
     ;;
 esac
-AC_DEFINE_UNQUOTED([LIBRARY_PATH],["$DEFINE_LIBRARY_PATH"],[Directory where architecture-dependent files live.])
-AC_SUBST([LIBRARY_PATH])
+AC_DEFINE_UNQUOTED([LIBRARY_ABSOLUTE_PATH],["$DEFINE_LIBRARY_ABSOLUTE_PATH"],[Directory where architecture-dependent files live.])
+AC_SUBST([LIBRARY_ABSOLUTE_PATH])
 
 #
 # path to local binaries
@@ -2983,7 +3158,7 @@ AC_SUBST([LIB_BIN_DIR])
 
 LIB_BIN_DIR_RELATIVE_PATH=$LIB_BIN_DIR
 AC_SUBST([LIB_BIN_DIR_RELATIVE_PATH])
-LIB_BIN_DIR_PATH="${LIBRARY_PATH}/${LIB_BIN_DIR_RELATIVE_PATH}"
+LIB_BIN_DIR_PATH="${LIBRARY_ABSOLUTE_PATH}/${LIB_BIN_DIR_RELATIVE_PATH}"
 AC_SUBST([LIB_BIN_DIR_PATH])
 
 #
@@ -3003,7 +3178,7 @@ AC_SUBST([MODULES_DIRNAME])
 
 MODULES_RELATIVE_PATH="${MODULES_DIRNAME}"
 AC_SUBST([MODULES_RELATIVE_PATH])
-MODULES_PATH="${LIBRARY_PATH}/${MODULES_RELATIVE_PATH}"
+MODULES_PATH="${LIBRARY_ABSOLUTE_PATH}/${MODULES_RELATIVE_PATH}"
 AC_SUBST([MODULES_PATH])
 
 #
@@ -3096,7 +3271,7 @@ AC_SUBST([SHAREARCH_DIRNAME])
 
 SHAREARCH_RELATIVE_PATH="${SHAREARCH_DIRNAME}"
 AC_SUBST([SHAREARCH_RELATIVE_PATH])
-SHAREARCH_PATH="${LIBRARY_PATH}/${SHAREARCH_RELATIVE_PATH}"
+SHAREARCH_PATH="${LIBRARY_ABSOLUTE_PATH}/${SHAREARCH_RELATIVE_PATH}"
 AC_SUBST([SHAREARCH_PATH])
 
 #
@@ -3112,7 +3287,8 @@ BPGDecodeDelegateDefault='bpgdec'
 BPGEncodeDelegateDefault='bpgenc'
 BlenderDecodeDelegateDefault='blender'
 BrowseDelegateDefault='xdg-open'
-DNGDecodeDelegateDefault='ufraw-batch'
+ClipboardDelegateDefault='xclip'
+DNGDecodeDelegateDefault='darktable-cli'
 DOCDecodeDelegateDefault='libreoffice'
 GVCDecodeDelegateDefault='dot'
 DVIDecodeDelegateDefault='dvips'
@@ -3131,6 +3307,7 @@ LEPDelegateDefault='lepton'
 LPDelegateDefault='lp'
 LPRDelegateDefault='lpr'
 LaunchDelegateDefault='gimp'
+MKDIRDelegateDefault='mkdir'
 MrSIDDecodeDelegateDefault='mrsidgeodecode'
 MVDelegateDefault='mv'
 PCLDelegateDefault='pcl6'
@@ -3157,7 +3334,8 @@ XPSDelegateDefault='gxps'
 AC_PATH_PROG([BPGDecodeDelegate],["$BPGDecodeDelegateDefault"],["$BPGDecodeDelegateDefault"])
 AC_PATH_PROG([BPGEncodeDelegate],["$BPGEncodeDelegateDefault"],["$BPGEncodeDelegateDefault"])
 AC_PATH_PROG([BlenderDecodeDelegate],["$BlenderDecodeDelegateDefault"],["$BlenderDecodeDelegateDefault"])
-AC_PATH_PROGS([BrowseDelegate],["$BrowseDelegateDefault" google-chrome firefox konqueror mozilla lynx],["$BrowseDelegateDefault"])
+AC_PATH_PROGS([BrowseDelegate],["$BrowseDelegateDefault" brave-browser microsoft-edge google-chrome firefox konqueror lynx],["$BrowseDelegateDefault"])
+AC_PATH_PROGS([ClipboardDelegate],["$ClipboardDelegateDefault"],["$ClipboardDelegateDefault"])
 AC_PATH_PROG([DNGDecodeDelegate],["$DNGDecodeDelegateDefault"],["$DNGDecodeDelegateDefault"])
 AC_PATH_PROG([DOCDecodeDelegate],["$DOCDecodeDelegateDefault"],["$DOCDecodeDelegateDefault"])
 AC_PATH_PROG([DVIDecodeDelegate],["$DVIDecodeDelegateDefault"],["$DVIDecodeDelegateDefault"])
@@ -3178,6 +3356,7 @@ AC_PATH_PROG([LaunchDelegate],["$LaunchDelegateDefault"],["$LaunchDelegateDefaul
 AC_PATH_PROG([MogrifyDelegate],["$MogrifyDelegateDefault"],["$MogrifyDelegateDefault"])
 AC_PATH_PROG([VIDEODecodeDelegate],["$VIDEODecodeDelegateDefault"],["$VIDEODecodeDelegateDefault"])
 AC_PATH_PROG([VIDEOEncodeDelegate],["$VIDEOEncodeDelegateDefault"],["$VIDEOEncodeDelegateDefault"])
+AC_PATH_PROG([MKDIRDelegate],["$MKDIRDelegateDefault"],["$MKDIRDelegateDefault"])
 AC_PATH_PROG([MrSIDDecodeDelegate],["$MrSIDDecodeDelegateDefault"],["$MrSIDDecodeDelegateDefault"])
 AC_PATH_PROG([MVDelegate],["$MVDelegateDefault"],["$MVDelegateDefault"])
 AC_PATH_PROG([PCLDelegate],["$PCLDelegateDefault"],["$PCLDelegateDefault"])
@@ -3201,7 +3380,7 @@ else
 fi
 AC_SUBST([PrintDelegate])
 
-# Installed ImageMagick utiltity paths
+# Installed ImageMagick utility paths
 ConvertDelegate="${BIN_DIR}/${ConvertDelegateDefault}"
 DisplayDelegate="${BIN_DIR}/${DisplayDelegateDefault}"
 MogrifyDelegate="${BIN_DIR}/${MogrifyDelegateDefault}"
@@ -3248,7 +3427,7 @@ dejavu_font_dir=''
 if test "${with_dejavu_font_dir}" != 'default'; then
   dejavu_font_dir="${with_dejavu_font_dir}/"
 else
-  for font_dir in "${prefix}/share/dejavu/fonts/" '/usr/share/fonts/dejavu/'; do
+  for font_dir in "${prefix}/share/fonts/dejavu" "${prefix}/share/dejavu-serif-fonts/fonts/" '/usr/share/fonts/dejavu-serif-fonts/' '/usr/share/fonts/truetype/dejavu/'; do
     if test -f "${font_dir}DejaVuSerif.ttf"; then
       dejavu_font_dir="${font_dir}"
       break 1
@@ -3308,12 +3487,19 @@ case "${build_os}" in
     ;;
 esac
 
-# URW-base35 fonts.
-AC_MSG_CHECKING([for URW-base35 fonts directory])
+# URW-base35 OTF fonts.
+AC_MSG_CHECKING([for URW-base35 OTF fonts directory])
 urw_base35_font_dir=''
 if test "${with_urw_base35_font_dir}" != 'default'; then
   urw_base35_font_dir="${with_urw_base35_font_dir}/"
-fi
+else
+  for font_dir in "${prefix}/share/urw-base35/fonts/" "${prefix}/share/fonts/opentype/urw-base35" '/usr/share/fonts/urw-base35/' '/usr/share/fonts/opentype/urw-base35/'; do
+    if test -f "${font_dir}URWGothic-Book.otf"; then
+      urw_base35_font_dir="${font_dir}"
+      break 1
+    fi
+  done
+fi 
 if test "${urw_base35_font_dir}x" != 'x'; then
   type_include_files="${type_include_files} "'<include file="type-urw-base35.xml" />'
   AC_MSG_RESULT([$urw_base35_font_dir])
@@ -3322,13 +3508,34 @@ else
 fi
 AC_SUBST([urw_base35_font_dir])
 
+# URW-base35 Type1 fonts.
+AC_MSG_CHECKING([for URW-base35 Type1 fonts directory])
+urw_base35_type1_font_dir=''
+if test "${with_urw_base35_type1_font_dir}" != 'default'; then
+  urw_base35_type1_font_dir="${with_urw_base35_type1_font_dir}/"
+else
+  for font_dir in "${prefix}/share/urw-base35/fonts/" "${prefix}/share/fonts/type1/urw-base35" '/usr/share/fonts/urw-base35/' '/usr/share/fonts/type1/urw-base35/'; do
+    if test -f "${font_dir}URWGothic-Book.t1"; then
+      urw_base35_type1_font_dir="${font_dir}"
+      break 1
+    fi
+  done
+fi 
+if test "${urw_base35_type1_font_dir}x" != 'x'; then
+  type_include_files="${type_include_files} "'<include file="type-urw-base35-type1.xml" />'
+  AC_MSG_RESULT([$urw_base35_type1_font_dir])
+else
+  AC_MSG_RESULT([not found!]);
+fi
+AC_SUBST([urw_base35_type1_font_dir])
+
 # Windows fonts.
 AC_MSG_CHECKING([for Windows fonts directory])
 windows_font_dir=''
 if test "${with_windows_font_dir}" != 'default'; then
   windows_font_dir="${with_windows_font_dir}/"
 else
-  for font_dir in '/usr/X11R6/lib/X11/fonts/truetype/' '/usr/X11R7/lib/X11/fonts/truetype/' '/usr/share/fonts/msttcore/' '/usr/share/fonts/microsoft/' '/usr/share/fonts/truetype/msttcorefonts/'; do
+  for font_dir in '/usr/share/wine/fonts/' '/usr/share/fonts/msttcore/' '/usr/share/fonts/microsoft/' '/usr/share/fonts/truetype/msttcorefonts/'; do
     if test -f "${font_dir}arial.ttf"; then
       windows_font_dir="${font_dir}"
       break 1
@@ -3345,6 +3552,82 @@ AC_SUBST([windows_font_dir])
 
 AC_SUBST([type_include_files])
 
+# Permit enciphering and deciphering image pixels.
+AC_ARG_ENABLE([cipher],
+    [AS_HELP_STRING([--disable-cipher],
+                    [disable enciphering and deciphering image pixels])],
+    [enable_cipher=$enableval],
+    [enable_cipher='yes'])
+
+if test "$enable_cipher" = 'yes'; then
+    AC_DEFINE([CIPHER_SUPPORT],[1],[permit enciphering and deciphering image pixels])
+    MAGICK_FEATURES="Cipher $MAGICK_FEATURES"
+fi
+
+#
+# Check for extended channel masks.
+#
+AC_ARG_ENABLE([64bit_channel_masks],
+    [AS_HELP_STRING([--enable-64bit-channel-masks],
+                    [enable 64-bit channel masks])],
+    [enable_64bit_channel_masks=$enableval],
+    [enable_64bit_channel_masks='no'])
+
+AC_ARG_ENABLE([force_cpp],
+    [AS_HELP_STRING([--enable-force-cpp],
+                    [treat the input files as C++ code])],
+    [enable_force_cpp=$enableval],
+    [enable_force_cpp='no'])
+
+magick_channel_mask_depth='32';
+if test "$enable_64bit_channel_masks" = 'yes'; then
+    if test "$enable_force_cpp" = 'yes'; then
+        AC_MSG_CHECKING([whether the compiler supports -x c++ option])
+        old_CFLAGS="$CFLAGS"
+        CFLAGS="$CFLAGS -x c++"
+        AC_COMPILE_IFELSE([
+          AC_LANG_PROGRAM([
+            enum Days : int { Monday = 1 };
+          ],
+          [
+          ])
+        ], [
+          AC_MSG_RESULT([yes])
+          magick_channel_mask_depth='64';
+        ], [
+          AC_MSG_RESULT([no])
+        ])
+        if test "$magick_channel_mask_depth" != '64'; then
+          CFLAGS="$old_CFLAGS"
+        fi
+    else
+        AC_MSG_CHECKING([whether the compiler supports enum type modifiers])
+        AC_COMPILE_IFELSE([
+          AC_LANG_PROGRAM([
+            enum Days : int { Monday = 1 };
+          ],
+          [
+          ])
+        ], [
+          AC_MSG_RESULT([yes])
+          magick_channel_mask_depth='64';
+        ], [
+          AC_MSG_RESULT([no])
+        ])
+    fi
+fi
+if test "$magick_channel_mask_depth" = '64'; then
+    MAGICK_FEATURES="Channel-masks(64-bit) $MAGICK_FEATURES"
+else
+    MAGICK_FEATURES="Channel-masks(32-bit) $MAGICK_FEATURES"
+fi
+AC_DEFINE_UNQUOTED([CHANNEL_MASK_DEPTH],[$magick_channel_mask_depth],[Channel mask depth])
+CHANNEL_MASK_DEPTH=$magick_channel_mask_depth
+AC_SUBST([CHANNEL_MASK_DEPTH])dnl
+MAGICK_PCFLAGS="$MAGICK_PCFLAGS -DMAGICKCORE_CHANNEL_MASK_DEPTH=$magick_channel_mask_depth"
+CFLAGS="$CFLAGS -DMAGICKCORE_CHANNEL_MASK_DEPTH=$magick_channel_mask_depth"
+CPPFLAGS="$CPPFLAGS -DMAGICKCORE_CHANNEL_MASK_DEPTH=$magick_channel_mask_depth"
+
 #
 # Handle case where user doesn't want frozen paths
 #
@@ -3354,6 +3637,7 @@ if test "$with_frozenpaths" != 'yes'; then
   BPGEncodeDelegate="$BPGEncodeDelegateDefault"
   BlenderDecodeDelegate="$BlenderDecodeDelegateDefault"
   BrowseDelegate="$BrowseDelegateDefault"
+  ClipboardDelegate="$ClipboardDelegateDefault"
   ConvertDelegate="$ConvertDelegateDefault"
   DisplayDelegate="$DisplayDelegateDefault"
   DNGDecodeDelegate="$DNGDecodeDelegateDefault"
@@ -3393,6 +3677,7 @@ AC_SUBST([BPGDecodeDelegate])
 AC_SUBST([BPGEncodeDelegate])
 AC_SUBST([BlenderDecodeDelegate])
 AC_SUBST([BrowseDelegate])
+AC_SUBST([ClipboardDelegate])
 AC_SUBST([ConvertDelegate])
 AC_SUBST([GVCDecodeDelegate])
 AC_SUBST([DVIDecodeDelegate])
@@ -3454,7 +3739,7 @@ AM_CONDITIONAL([ZIP_DELEGATE],[test "x$ZIP" != "x"])
 #
 # GhostPCL related configuration.
 #
-PCLColorDevice=ppmraw
+PCLColorDevice=png16malpha
 PCLCMYKDevice=pamcmyk32
 PCLMonoDevice=pbmraw
 if test -z "$PCLVersion"; then
@@ -3500,8 +3785,8 @@ AC_SUBST([PCLVersion])
 #
 # GhostXPS related configuration.
 #
-XPSColorDevice=ppmraw
-XPSCMYKDevice=bmpsep8
+XPSColorDevice=png16malpha
+XPSCMYKDevice=pamcmyk32
 XPSMonoDevice=pbmraw
 if test -z "$XPSVersion"; then
     XPSVersion='unknown'
@@ -3546,7 +3831,7 @@ AC_SUBST([XPSVersion])
 #
 # Ghostscript related configuration.
 #
-GSAlphaDevice=pngalpha
+GSAlphaDevice=png16malpha
 GSColorDevice=png16m
 GSCMYKDevice=pamcmyk32
 GSMonoDevice=pbmraw
@@ -3579,6 +3864,8 @@ if test $have_gs = 'yes'; then
     AC_MSG_CHECKING([for gs alpha device])
     if $PSDelegate -q -dBATCH -sDEVICE=$GSAlphaDevice -sOutputFile=/dev/null < /dev/null 1>&AS_MESSAGE_LOG_FD 2>&AS_MESSAGE_LOG_FD; then
         :
+    elif $PSDelegate -q -dBATCH -sDEVICE=pngalpha -sOutputFile=/dev/null < /dev/null 1>&AS_MESSAGE_LOG_FD 2>&AS_MESSAGE_LOG_FD; then
+        GSAlphaDevice=pngalpha
     else
         GSAlphaDevice=$GSColorDevice
     fi
@@ -3705,11 +3992,17 @@ fi
 if test "$have_bzlib"  = 'yes' ; then
    MAGICK_DELEGATES="$MAGICK_DELEGATES bzlib"
 fi
-if test "$have_dps"    = 'yes' ; then
-   MAGICK_DELEGATES="$MAGICK_DELEGATES dps"
+if test "$have_cairo"    = 'yes' ; then
+   MAGICK_DELEGATES="$MAGICK_DELEGATES cairo"
+fi
+if test "$have_dmr"    = 'yes' ; then
+   MAGICK_DELEGATES="$MAGICK_DELEGATES dmr"
 fi
 if test "$have_djvu"    = 'yes' ; then
    MAGICK_DELEGATES="$MAGICK_DELEGATES djvu"
+fi
+if test "$have_dps"    = 'yes' ; then
+   MAGICK_DELEGATES="$MAGICK_DELEGATES dps"
 fi
 if test "$have_fftw"    = 'yes' ; then
    MAGICK_DELEGATES="$MAGICK_DELEGATES fftw"
@@ -3738,6 +4031,9 @@ fi
 if test "$have_png$have_jpeg" = 'yesyes' ; then
    MAGICK_DELEGATES="$MAGICK_DELEGATES jng"
 fi
+if test "$have_openjp2"    = 'yes' ; then
+   MAGICK_DELEGATES="$MAGICK_DELEGATES jp2"
+fi
 if test "$have_jpeg"   = 'yes' ; then
    MAGICK_DELEGATES="$MAGICK_DELEGATES jpeg"
 fi
@@ -3756,11 +4052,11 @@ fi
 if test "$have_openexr"    = 'yes' ; then
    MAGICK_DELEGATES="$MAGICK_DELEGATES openexr"
 fi
-if test "$have_openjp2"    = 'yes' ; then
-   MAGICK_DELEGATES="$MAGICK_DELEGATES openjp2"
+if test "$have_pangocairo" = 'yes' ; then
+   MAGICK_DELEGATES="$MAGICK_DELEGATES pangocairo"
 fi
-if test "$have_pango"    = 'yes' ; then
-   MAGICK_DELEGATES="$MAGICK_DELEGATES pango"
+if test "$have_pcl"    = 'yes' ; then
+   MAGICK_DELEGATES="$MAGICK_DELEGATES pcl"
 fi
 if test "$have_png"    = 'yes' ; then
    MAGICK_DELEGATES="$MAGICK_DELEGATES png"
@@ -3792,6 +4088,9 @@ fi
 if test "$have_ttf"    = 'yes' ; then
    MAGICK_DELEGATES="$MAGICK_DELEGATES ttf"
 fi
+if test "$have_uhdr"   = 'yes' ; then
+   MAGICK_DELEGATES="$MAGICK_DELEGATES uhdr"
+fi
 if test "$have_video"   = 'yes' ; then
    MAGICK_DELEGATES="$MAGICK_DELEGATES video"
 fi
@@ -3817,7 +4116,7 @@ if test "$have_zstd"   = 'yes' ; then
    MAGICK_DELEGATES="$MAGICK_DELEGATES zstd"
 fi
 
-# Remove extraneous spaces from output variables (asthetic)
+# Remove extraneous spaces from output variables (aesthetic)
 MAGICK_DELEGATES=`echo $MAGICK_DELEGATES | sed -e 's/  */ /g'`
 MAGICK_FEATURES=`echo $MAGICK_FEATURES | sed -e 's/  */ /g'`
 AC_SUBST([MAGICK_DELEGATES])
@@ -3865,9 +4164,9 @@ fi
 #
 
 if test "$build_modules" != 'no'; then
-    MAGICK_DEP_LIBS="$USER_LIBS $LCMS_LIBS $FREETYPE_LIBS $RAQM_LIBS $LQR_LIBS $FFTW_LIBS $XML_LIBS $FLIF_LIBS $FONTCONFIG_LIBS $XEXT_LIBS $IPC_LIBS $X11_LIBS $XT_LIBS $BZLIB_LIBS $ZLIB_LIBS $ZIP_LIBS $ZSTD_LIBS $LTDL_LIBS $GDI32_LIBS $MATH_LIBS $CL_LIBS $UMEM_LIBS $JEMALLOC_LIBS $THREAD_LIBS $TCMALLOC_LIBS"
+    MAGICK_DEP_LIBS="$USER_LIBS $LCMS_LIBS $DMR_LIBS $FREETYPE_LIBS $RAQM_LIBS $LQR_LIBS $FFTW_LIBS $XML_LIBS $FLIF_LIBS $FONTCONFIG_LIBS $XEXT_LIBS $IPC_LIBS $X11_LIBS $XT_LIBS $BZLIB_LIBS $ZLIB_LIBS $ZIP_LIBS $ZSTD_LIBS $LTDL_LIBS $GDI32_LIBS $MATH_LIBS $CL_LIBS $UMEM_LIBS $JEMALLOC_LIBS $THREAD_LIBS $TCMALLOC_LIBS $MTMALLOC_LIBS"
 else
-    MAGICK_DEP_LIBS="$USER_LIBS $JBIG_LIBS $LCMS_LIBS $TIFF_LIBS $FREETYPE_LIBS $RAQM_LIBS $JPEG_LIBS $JXL_LIBS $GS_LIBS $LQR_LIBS $PNG_LIBS $AUTOTRACE_LIBS $DJVU_LIBS $FFTW_LIBS $FLIF_LIBS $FPX_LIBS $FONTCONFIG_LIBS $HEIF_LIBS $WEBPMUX_LIBS $WEBP_LIBS $WMF_LIBS $DPS_LIBS $XEXT_LIBS $XT_LIBS $IPC_LIBS $X11_LIBS $LZMA_LIBS $BZLIB_LIBS $OPENEXR_LIBS $LIBOPENJP2_LIBS $PANGO_LIBS $RAW_R_LIBS $RSVG_LIBS $XML_LIBS $GVC_LIBS $ZLIB_LIBS $ZIP_LIBS $ZSTD_LIBS $LTDL_LIBS $GDI32_LIBS $MATH_LIBS $CL_LIBS $UMEM_LIBS $JEMALLOC_LIBS $THREAD_LIBS $TCMALLOC_LIBS"
+    MAGICK_DEP_LIBS="$USER_LIBS $JBIG_LIBS $LCMS_LIBS $DMR_LIBS $TIFF_LIBS $FREETYPE_LIBS $RAQM_LIBS $JPEG_LIBS $JXL_LIBS $GS_LIBS $LQR_LIBS $PNG_LIBS $AUTOTRACE_LIBS $DJVU_LIBS $FFTW_LIBS $FLIF_LIBS $FPX_LIBS $FONTCONFIG_LIBS $HEIF_LIBS $WEBPMUX_LIBS $WEBP_LIBS $WMF_LIBS $DPS_LIBS $XEXT_LIBS $XT_LIBS $IPC_LIBS $X11_LIBS $LZMA_LIBS $BZLIB_LIBS $OPENEXR_LIBS $LIBOPENJP2_LIBS $PANGO_LIBS $RAW_R_LIBS $RSVG_LIBS $XML_LIBS $GVC_LIBS $ZLIB_LIBS $ZIP_LIBS $ZSTD_LIBS $LTDL_LIBS $GDI32_LIBS $MATH_LIBS $CL_LIBS $UMEM_LIBS $JEMALLOC_LIBS $THREAD_LIBS $TCMALLOC_LIBS $MTMALLOC_LIBS $UHDR_LIBS"
 fi
 MAGICK_EXTRA_DEP_LIBS="$GOMP_LIBS"
 AC_SUBST([MAGICK_DEP_LIBS])
@@ -3883,12 +4182,21 @@ AC_SUBST([X_CFLAGS])
 #AC_SUBST([X_LIBS])
 #AC_SUBST([X_EXTRA_LIBS])
 
+CC=`echo $CC | sed -e 's/  */ /g'`
+CFLAGS=`echo $CFLAGS | sed -e 's/  */ /g'`
+CPPFLAGS=`echo $CPPFLAGS | sed -e 's/  */ /g'`
+CXXFLAGS=`echo $CXXFLAGS | sed -e 's/  */ /g'`
+LDFLAGS=`echo $LDFLAGS | sed -e 's/  */ /g'`
+LIBS=`echo $LIBS | sed -e 's/  */ /g'`
+
 MAGICK_CFLAGS=$CFLAGS
 MAGICK_CXXFLAGS="$CXXFLAGS"
 MAGICK_CPPFLAGS=`echo $MAGICK_CPPFLAGS | sed -e 's/  */ /g'`
 MAGICK_PCFLAGS=`echo $MAGICK_PCFLAGS | sed -e 's/  */ /g'`
 MAGICK_LDFLAGS="-L$LIB_DIR $LDFLAGS"
 MAGICK_LIBS="$MAGICK_DEP_LIBS $MAGICK_EXTRA_DEP_LIBS"
+MAGICK_DEP_LIBS=`echo $MAGICK_DEP_LIBS | sed -e 's/  */ /g'`
+MAGICK_EXTRA_DEP_LIBS=`echo $MAGICK_EXTRA_DEP_LIBS | sed -e 's/  */ /g'`
 
 AC_SUBST([MAGICK_CFLAGS])
 AC_SUBST([MAGICK_CXXFLAGS])
@@ -3925,6 +4233,11 @@ if test "${urw_base35_font_dir}x" != 'x'; then
     result_urw_base35_font_dir=$urw_base35_font_dir
 fi
 
+result_urw_base35_type1_font_dir='none'
+if test "${urw_base35_type1_font_dir}x" != 'x'; then
+    result_urw_base35_type1_font_dir=$urw_base35_type1_font_dir
+fi
+
 result_windows_font_dir='none'
 if test "${windows_font_dir}x" != 'x'; then
     result_windows_font_dir=${windows_font_dir}
@@ -3934,7 +4247,9 @@ fi
 # Generate build environment
 # ==============================================================================
 AC_CONFIG_FILES([\
+    app-image/AppRun \
     common.shi \
+    config/policy.xml:config/policy-"$magick_cv_with_security_policy".xml \
     config/configure.xml \
     config/delegates.xml \
     config/ImageMagick.rdf \
@@ -3945,6 +4260,7 @@ AC_CONFIG_FILES([\
     config/type-dejavu.xml \
     config/type-ghostscript.xml \
     config/type-urw-base35.xml \
+    config/type-urw-base35-type1.xml \
     config/type-windows.xml \
     config/type.xml \
     ImageMagick.spec \
@@ -3987,100 +4303,107 @@ AC_OUTPUT
 # ==============================================================================
 AC_MSG_NOTICE([
 ==============================================================================
-${PACKAGE_NAME} ${PACKAGE_VERSION} is configured as follows. Please verify that this
-configuration matches your expectations.
+${PACKAGE_NAME} ${PACKAGE_VERSION} is configured as follows. Verify that this configuration
+matches your expectations.
 
 Host system type: $host
 Build system type: $build
 
-                  Option                        Value
+                    Option				Value
 ------------------------------------------------------------------------------
-Shared libraries  --enable-shared=$enable_shared		$libtool_build_shared_libs
-Static libraries  --enable-static=$enable_static		$libtool_build_static_libs
-Build utilities   --with-utilities=$with_utilities		$with_utilities
-Module support    --with-modules=$build_modules		$build_modules
-GNU ld            --with-gnu-ld=$with_gnu_ld		$lt_cv_prog_gnu_ld
-Quantum depth     --with-quantum-depth=$with_quantum_depth	$with_quantum_depth
+Shared libraries    --enable-shared=$enable_shared			$libtool_build_shared_libs
+Static libraries    --enable-static=$enable_static			$libtool_build_static_libs
+Build utilities     --with-utilities=$with_utilities		$with_utilities
+Module support      --with-modules=$build_modules			$build_modules
+GNU ld              --with-gnu-ld=$with_gnu_ld			$lt_cv_prog_gnu_ld
+OpenMP              --enable-openmp=$enable_openmp			${OPENMP_ENABLED}
+Security policy     --with-security-policy=$security_policy	        $security_policy
+Quantum depth       --with-quantum-depth=$with_quantum_depth		$with_quantum_depth
+Channel mask depth  --enable-64bit-channel-masks=$enable_64bit_channel_masks	$magick_channel_mask_depth
 High Dynamic Range Imagery
-                  --enable-hdri=$enable_hdri		$enable_hdri
+                    --enable-hdri=$enable_hdri			$enable_hdri
 
-Install documentation:				$wantdocs
+Install documentation:					$wantdocs
 
 Memory allocation library:
-  JEMalloc          --with-jemalloc=$with_jemalloc		$have_jemalloc
-  TCMalloc          --with-tcmalloc=$with_tcmalloc		$have_tcmalloc
-  UMem              --with-umem=$with_umem		$have_umem
+  JEMalloc          --with-jemalloc=$with_jemalloc			$have_jemalloc
+  MTMalloc          --with-mtmalloc=$with_mtmalloc			$have_mtmalloc
+  TCMalloc          --with-tcmalloc=$with_tcmalloc			$have_tcmalloc
+  UMem              --with-umem=$with_umem			$have_umem
 
 Delegate library configuration:
-  BZLIB             --with-bzlib=$with_bzlib		$have_bzlib
-  Autotrace         --with-autotrace=$with_autotrace		$have_autotrace
-  DJVU              --with-djvu=$with_djvu		$have_djvu
-  DPS               --with-dps=$with_dps		$have_dps
-  FFTW              --with-fftw=$with_fftw		$have_fftw
-  FLIF              --with-flif=$with_flif		$have_flif
-  FlashPIX          --with-fpx=$with_fpx		$have_fpx
-  FontConfig        --with-fontconfig=$with_fontconfig	$have_fontconfig
-  FreeType          --with-freetype=$with_freetype		$have_freetype
-  Ghostscript lib   --with-gslib=$with_gslib		$have_gslib
-  Graphviz          --with-gvc=$with_gvc		$have_gvc
-  HEIC              --with-heic=$with_heic		$have_heic
-  JBIG              --with-jbig=$with_jbig		$have_jbig
-  JPEG v1           --with-jpeg=$with_jpeg		$have_jpeg
-  JPEG XL           --with-jxl=$with_jxl		$have_jxl
-  LCMS              --with-lcms=$with_lcms		$have_lcms
-  LQR               --with-lqr=$with_lqr		$have_lqr
-  LTDL              --with-ltdl=$with_ltdl		$have_ltdl
-  LZMA              --with-lzma=$with_lzma		$have_lzma
-  Magick++          --with-magick-plus-plus=$with_magick_plus_plus	$have_magick_plus_plus
-  OpenEXR           --with-openexr=$with_openexr		$have_openexr
-  OpenJP2           --with-openjp2=$with_openjp2		$have_openjp2
-  PANGO             --with-pango=$with_pango		$have_pango
-  PERL              --with-perl=$with_perl		$have_perl
-  PNG               --with-png=$with_png		$have_png
-  RAQM              --with-raqm=$with_raqm		$have_raqm
-  RAW               --with-raw=$with_raw		$have_raw
-  RSVG              --with-rsvg=$with_rsvg		$have_rsvg
-  TIFF              --with-tiff=$with_tiff		$have_tiff
-  WEBP              --with-webp=$with_webp		$have_webp
-  WMF               --with-wmf=$with_wmf		$have_wmf
-  X11               --with-x=$with_x			$have_x
-  XML               --with-xml=$with_xml		$have_xml
-  ZIP               --with-zip=$with_zip		$have_zip
-  ZLIB              --with-zlib=$with_zlib		$have_zlib
-  ZSTD              --with-zstd=$with_zstd		$have_zstd
+  BZLIB             --with-bzlib=$with_bzlib			$have_bzlib
+  Autotrace         --with-autotrace=$with_autotrace			$have_autotrace
+  DJVU              --with-djvu=$with_djvu			$have_djvu
+  DPS               --with-dps=$with_dps			$have_dps
+  FFTW              --with-fftw=$with_fftw			$have_fftw
+  FLIF              --with-flif=$with_flif			$have_flif
+  FlashPIX          --with-fpx=$with_fpx			$have_fpx
+  FontConfig        --with-fontconfig=$with_fontconfig		$have_fontconfig
+  FreeType          --with-freetype=$with_freetype			$have_freetype
+  Ghostscript lib   --with-gslib=$with_gslib			$have_gslib
+  Graphviz          --with-gvc=$with_gvc			$have_gvc
+  HEIC              --with-heic=$with_heic			$have_heic
+  JBIG              --with-jbig=$with_jbig			$have_jbig
+  JPEG v1           --with-jpeg=$with_jpeg			$have_jpeg
+  JPEG XL           --with-jxl=$with_jxl			$have_jxl
+  DMR               --with-dmr=$with_dmr			$have_dmr
+  LCMS              --with-lcms=$with_lcms			$have_lcms
+  LQR               --with-lqr=$with_lqr			$have_lqr
+  LTDL              --with-ltdl=$with_ltdl			$have_ltdl
+  LZMA              --with-lzma=$with_lzma			$have_lzma
+  Magick++          --with-magick-plus-plus=$with_magick_plus_plus		$have_magick_plus_plus
+  OpenEXR           --with-openexr=$with_openexr			$have_openexr
+  OpenJP2           --with-openjp2=$with_openjp2			$have_openjp2
+  PANGO             --with-pango=$with_pango			$have_pangocairo
+  PERL              --with-perl=$with_perl			$have_perl
+  PNG               --with-png=$with_png			$have_png
+  RAQM              --with-raqm=$with_raqm			$have_raqm
+  RAW               --with-raw=$with_raw			$have_raw
+  RSVG              --with-rsvg=$with_rsvg			$have_rsvg
+  TIFF              --with-tiff=$with_tiff			$have_tiff
+  UHDR              --with-uhdr=$with_uhdr			$have_uhdr
+  WEBP              --with-webp=$with_webp			$have_webp
+  WMF               --with-wmf=$with_wmf			$have_wmf
+  X11               --with-x=$with_x				$have_x
+  XML               --with-xml=$with_xml			$have_xml
+  ZIP               --with-zip=$with_zip			$have_zip
+  ZLIB              --with-zlib=$with_zlib			$have_zlib
+  ZSTD              --with-zstd=$with_zstd			$have_zstd
 
 Delegate program configuration:
-  GhostPCL          None			$PCLDelegate ($PCLVersion)
-  GhostXPS          None			$XPSDelegate ($XPSVersion)
-  Ghostscript       None			$PSDelegate ($GSVersion)
+  GhostPCL          None				$PCLDelegate ($PCLVersion)
+  GhostXPS          None				$XPSDelegate ($XPSVersion)
+  Ghostscript       None				$PSDelegate ($GSVersion)
 
 Font configuration:
   Apple fonts       --with-apple-font-dir=$with_apple_font_dir	$result_apple_font_dir
   Dejavu fonts      --with-dejavu-font-dir=$with_dejavu_font_dir	$result_dejavu_font_dir
   Ghostscript fonts --with-gs-font-dir=$with_gs_font_dir		$result_ghostscript_font_dir
-  URW-base35 fonts  --with-urw-base35-font-dir=$with_urw_base35_font_dir	$result_urw_base35_font_dir
+  URW OTF fonts     --with-urw-base35-font-dir=$with_urw_base35_font_dir	$result_urw_base35_font_dir
+  URW Type1 fonts   --with-urw-base35-type1-font-dir=$with_urw_base35_type1_font_dir	$result_urw_base35_type1_font_dir
   Windows fonts     --with-windows-font-dir=$with_windows_font_dir	$result_windows_font_dir
 
 X11 configuration:
-  X_CFLAGS        = $X_CFLAGS
-  X_PRE_LIBS      = $X_PRE_LIBS
-  X_LIBS          = $X_LIBS
-  X_EXTRA_LIBS    = $X_EXTRA_LIBS
+  X_CFLAGS          = $X_CFLAGS
+  X_PRE_LIBS        = $X_PRE_LIBS
+  X_LIBS            = $X_LIBS
+  X_EXTRA_LIBS      = $X_EXTRA_LIBS
 
 Options used to compile and link:
-  PREFIX          = $PREFIX_DIR
-  EXEC-PREFIX     = $EXEC_PREFIX_DIR
-  VERSION         = $PACKAGE_VERSION
-  CC              = $CC
-  CFLAGS          = $CFLAGS
-  CPPFLAGS        = $CPPFLAGS
-  PCFLAGS         = $PCFLAGS
-  DEFS            = $DEFS
-  LDFLAGS         = $LDFLAGS
-  LIBS            = $MAGICK_DEP_LIBS
-  CXX             = $CXX
-  CXXFLAGS        = $CXXFLAGS
-  FEATURES        = $MAGICK_FEATURES
-  DELEGATES       = $MAGICK_DELEGATES
+  PREFIX            = $PREFIX_DIR
+  EXEC-PREFIX       = $EXEC_PREFIX_DIR
+  VERSION           = $PACKAGE_VERSION
+  CC                = $CC
+  CFLAGS            = $CFLAGS
+  CPPFLAGS          = $CPPFLAGS
+  PCFLAGS           = $PCFLAGS
+  DEFS              = $DEFS
+  LDFLAGS           = $LDFLAGS
+  LIBS              = $MAGICK_DEP_LIBS $MAGICK_EXTRA_DEP_LIBS
+  CXX               = $CXX
+  CXXFLAGS          = $CXXFLAGS
+  FEATURES          = $MAGICK_FEATURES
+  DELEGATES         = $MAGICK_DELEGATES
 ==============================================================================
 ])

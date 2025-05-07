@@ -17,7 +17,7 @@
 %                                 March 2000                                  %
 %                                                                             %
 %                                                                             %
-%  Copyright @ 2000 ImageMagick Studio LLC, a non-profit organization         %
+%  Copyright @ 1999 ImageMagick Studio LLC, a non-profit organization         %
 %  dedicated to making software imaging solutions freely available.           %
 %                                                                             %
 %  You may not use this file except in compliance with the License.  You may  %
@@ -479,7 +479,7 @@ MagickExport MagickBooleanType SetImageRegistry(const RegistryType type,
 
       string=(const char *) value;
       if (LocaleCompare(key,"date:precision") == 0)
-        SetMagickDatePrecision(StringToInteger(string));
+        SetMagickDatePrecision((size_t) StringToInteger(string));
       clone_value=(void *) ConstantString(string);
       break;
     }

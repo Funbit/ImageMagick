@@ -199,6 +199,7 @@ typedef struct _MemoryPool
 */
 static size_t
   max_memory_request = 0,
+  max_profile_size = 0,
   virtual_anonymous_memory = 0;
 
 #if defined _MSC_VER
@@ -771,7 +772,7 @@ MagickExport MemoryInfo *AcquireVirtualMemory(const size_t count,
               MagickOffsetType
                 offset;
 
-              offset=(MagickOffsetType) lseek(file,size-1,SEEK_SET);
+              offset=(MagickOffsetType) lseek(file,(off_t) (size-1),SEEK_SET);
               if ((offset == (MagickOffsetType) (size-1)) &&
                   (write(file,"",1) == 1))
                 {
@@ -851,14 +852,14 @@ MagickExport void *CopyMagickMemory(void *magick_restrict destination,
     switch (size)
     {
       default: return(memcpy(destination,source,size));
-      case 8: *q++=(*p++);
-      case 7: *q++=(*p++);
-      case 6: *q++=(*p++);
-      case 5: *q++=(*p++);
-      case 4: *q++=(*p++);
-      case 3: *q++=(*p++);
-      case 2: *q++=(*p++);
-      case 1: *q++=(*p++);
+      case 8: *q++=(*p++); magick_fallthrough;
+      case 7: *q++=(*p++); magick_fallthrough;
+      case 6: *q++=(*p++); magick_fallthrough;
+      case 5: *q++=(*p++); magick_fallthrough;
+      case 4: *q++=(*p++); magick_fallthrough;
+      case 3: *q++=(*p++); magick_fallthrough;
+      case 2: *q++=(*p++); magick_fallthrough;
+      case 1: *q++=(*p++); magick_fallthrough;
       case 0: return(destination);
     }
   return(memmove(destination,source,size));
@@ -1034,7 +1035,7 @@ MagickExport void GetMagickMemoryMethods(
 %                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
-%  GetMaxMemoryRequest() returns the max_memory_request value.
+%  GetMaxMemoryRequest() returns the max memory request value.
 %
 %  The format of the GetMaxMemoryRequest method is:
 %
@@ -1063,6 +1064,44 @@ MagickExport size_t GetMaxMemoryRequest(void)
         }
     }
   return(MagickMin(max_memory_request,(size_t) MAGICK_SSIZE_MAX));
+}
+/*
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                                                                             %
+%                                                                             %
+%                                                                             %
++   G e t M a x P r o f i l e S i z e                                         %
+%                                                                             %
+%                                                                             %
+%                                                                             %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+%  GetMaxProfileSize() returns the max profile size value.
+%
+%  The format of the GetMaxMemoryRequest method is:
+%
+%      size_t GetMaxProfileSize(void)
+%
+*/
+MagickExport size_t GetMaxProfileSize(void)
+{
+  if (max_profile_size == 0)
+    {
+      char
+        *value;
+
+      max_profile_size=(size_t) MAGICK_SSIZE_MAX;
+      value=GetPolicyValue("system:max-profile-size");
+      if (value != (char *) NULL)
+        {
+          /*
+            The security policy sets a max profile size limit.
+          */
+          max_profile_size=StringToSizeType(value,100.0);
+          value=DestroyString(value);
+        }
+    }
+  return(MagickMin(max_profile_size,(size_t) MAGICK_SSIZE_MAX));
 }
 
 /*
@@ -1559,6 +1598,60 @@ MagickExport void SetMagickMemoryMethods(
 %                                                                             %
 %                                                                             %
 %                                                                             %
++   S e t M a x M e m o r y R e q u e s t                                     %
+%                                                                             %
+%                                                                             %
+%                                                                             %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+%  SetMaxMemoryRequest() sets the max memory request value.
+%
+%  The format of the SetMaxMemoryRequest method is:
+%
+%      void SetMaxMemoryRequest(const MagickSizeType limit)
+%
+%  A description of each parameter follows:
+%
+%    o limit: the maximum memory request limit.
+%
+*/
+MagickPrivate void SetMaxMemoryRequest(const MagickSizeType limit)
+{
+  max_memory_request=(size_t) MagickMin(limit,GetMaxMemoryRequest());
+}
+
+/*
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                                                                             %
+%                                                                             %
+%                                                                             %
++   S e t M a x P r o f i l e S i z e                                         %
+%                                                                             %
+%                                                                             %
+%                                                                             %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+%  SetMaxProfileSize() sets the max profile size value.
+%
+%  The format of the SetMaxProfileSize method is:
+%
+%      void SetMaxProfileSize(const MagickSizeType limit)
+%
+%  A description of each parameter follows:
+%
+%    o limit: the maximum profile size limit.
+%
+*/
+MagickPrivate void SetMaxProfileSize(const MagickSizeType limit)
+{
+  max_profile_size=(size_t) MagickMin(limit,GetMaxProfileSize());
+}
+
+/*
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                                                                             %
+%                                                                             %
+%                                                                             %
 %   S h r e d M a g i c k M e m o r y                                         %
 %                                                                             %
 %                                                                             %
@@ -1641,7 +1734,7 @@ MagickPrivate MagickBooleanType ShredMagickMemory(void *memory,
         SetRandomKey(random_info,quantum,GetStringInfoDatum(key));
       (void) memcpy(p,GetStringInfoDatum(key),(size_t)
         MagickMin(quantum,length-j));
-      p+=quantum;
+      p+=(ptrdiff_t) quantum;
     }
     if (j < length)
       break;

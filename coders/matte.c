@@ -176,7 +176,7 @@ static MagickBooleanType WriteMATTEImage(const ImageInfo *image_info,
   ssize_t
     y;
 
-  if (image->alpha_trait == UndefinedPixelTrait)
+  if ((image->alpha_trait & BlendPixelTrait) == 0)
     ThrowWriterException(CoderError,"ImageDoesNotHaveAnAlphaChannel");
   matte_image=CloneImage(image,0,0,MagickTrue,exception);
   if (matte_image == (Image *) NULL)
@@ -198,8 +198,8 @@ static MagickBooleanType WriteMATTEImage(const ImageInfo *image_info,
       SetPixelGreen(matte_image,GetPixelAlpha(image,p),q);
       SetPixelBlue(matte_image,GetPixelAlpha(image,p),q);
       SetPixelAlpha(matte_image,OpaqueAlpha,q);
-      p+=GetPixelChannels(image);
-      q+=GetPixelChannels(matte_image);
+      p+=(ptrdiff_t) GetPixelChannels(image);
+      q+=(ptrdiff_t) GetPixelChannels(matte_image);
     }
     if (SyncAuthenticPixels(matte_image,exception) == MagickFalse)
       break;

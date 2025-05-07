@@ -17,7 +17,7 @@
 %                                 May 2001                                    %
 %                                                                             %
 %                                                                             %
-%  Copyright @ 2001 ImageMagick Studio LLC, a non-profit organization         %
+%  Copyright @ 1999 ImageMagick Studio LLC, a non-profit organization         %
 %  dedicated to making software imaging solutions freely available.           %
 %                                                                             %
 %  You may not use this file except in compliance with the License.  You may  %
@@ -190,9 +190,6 @@ static void *DestroyTypeNode(void *type_info)
 static SplayTreeInfo *AcquireTypeCache(const char *filename,
   ExceptionInfo *exception)
 {
-  MagickStatusType
-    status;
-
   SplayTreeInfo
     *cache;
 
@@ -200,7 +197,6 @@ static SplayTreeInfo *AcquireTypeCache(const char *filename,
     DestroyTypeNode);
   if (cache == (SplayTreeInfo *) NULL)
     ThrowFatalException(ResourceLimitFatalError,"MemoryAllocationFailed");
-  status=MagickTrue;
 #if !MAGICKCORE_ZERO_CONFIGURATION_SUPPORT
   {
     char
@@ -219,8 +215,8 @@ static SplayTreeInfo *AcquireTypeCache(const char *filename,
     while (option != (const StringInfo *) NULL)
     {
       (void) CopyMagickString(path,GetStringInfoPath(option),MagickPathExtent);
-      status&=LoadTypeCache(cache,(const char *)
-        GetStringInfoDatum(option),GetStringInfoPath(option),0,exception);
+      (void) LoadTypeCache(cache,(const char *) GetStringInfoDatum(option),
+        GetStringInfoPath(option),0,exception);
       option=(const StringInfo *) GetNextValueInLinkedList(options);
     }
     options=DestroyConfigureOptions(options);
@@ -238,7 +234,7 @@ static SplayTreeInfo *AcquireTypeCache(const char *filename,
         xml=FileToString(path,~0UL,exception);
         if (xml != (void *) NULL)
           {
-            status&=LoadTypeCache(cache,xml,path,0,exception);
+            (void) LoadTypeCache(cache,xml,path,0,exception);
             xml=DestroyString(xml);
           }
         font_path=DestroyString(font_path);
@@ -248,9 +244,7 @@ static SplayTreeInfo *AcquireTypeCache(const char *filename,
   magick_unreferenced(filename);
 #endif
   if (GetNumberOfNodesInSplayTree(cache) == 0)
-    status&=LoadTypeCache(cache,TypeMap,"built-in",0,exception);
-  if (status == MagickFalse)
-    ;
+    (void) LoadTypeCache(cache,TypeMap,"built-in",0,exception);
   return(cache);
 }
 
@@ -337,15 +331,16 @@ MagickExport const TypeInfo *GetTypeInfoByFamily(const char *family,
   } Fontmap;
 
   const TypeInfo
+    *p,
     *type_info;
 
-  const TypeInfo
-    *p;
+  size_t
+    font_weight,
+    max_score,
+    score;
 
   ssize_t
-    i;
-
-  ssize_t
+    i,
     range;
 
   static const Fontmap
@@ -359,11 +354,6 @@ MagickExport const TypeInfo *GetTypeInfoByFamily(const char *family,
       { "terminal", "courier" },
       { "wingdings", "symbol" }
     };
-
-  size_t
-    font_weight,
-    max_score,
-    score;
 
   /*
     Check for an exact type match.
@@ -456,15 +446,16 @@ MagickExport const TypeInfo *GetTypeInfoByFamily(const char *family,
       if (((style == ItalicStyle) || (style == ObliqueStyle)) &&
           ((p->style == ItalicStyle) || (p->style == ObliqueStyle)))
         score+=25;
-    score+=(16*(800-((ssize_t) MagickMax(MagickMin(font_weight,900),p->weight)-
-      (ssize_t) MagickMin(MagickMin(font_weight,900),p->weight))))/800;
+    score+=(size_t) ((16L*(800L-((ssize_t) MagickMax(MagickMin(font_weight,900),
+      p->weight)-(ssize_t) MagickMin(MagickMin(font_weight,900),p->weight))))/
+      800L);
     if ((stretch == UndefinedStretch) || (stretch == AnyStretch))
       score+=8;
     else
       {
         range=(ssize_t) UltraExpandedStretch-(ssize_t) NormalStretch;
-        score+=(8*(range-((ssize_t) MagickMax(stretch,p->stretch)-
-          (ssize_t) MagickMin(stretch,p->stretch))))/range;
+        score+=(size_t) ((ssize_t) (8L*(range-((ssize_t) MagickMax(stretch,
+          p->stretch)-(ssize_t) MagickMin(stretch,p->stretch))))/range);
       }
     if (score > max_score)
       {
@@ -757,6 +748,7 @@ MagickExport MagickBooleanType LoadFontConfigFonts(SplayTreeInfo *type_cache,
     status;
 
   int
+    index,
     slant,
     width,
     weight;
@@ -777,10 +769,10 @@ MagickExport MagickBooleanType LoadFontConfigFonts(SplayTreeInfo *type_cache,
   font_config=FcConfigGetCurrent();
   if (font_config == (FcConfig *) NULL)
     return(MagickFalse);
-  FcConfigSetRescanInterval(font_config,0);
+  (void) FcConfigSetRescanInterval(font_config,0);
   font_set=(FcFontSet *) NULL;
   object_set=FcObjectSetBuild(FC_FULLNAME,FC_FAMILY,FC_STYLE,FC_SLANT,
-    FC_WIDTH,FC_WEIGHT,FC_FILE,(char *) NULL);
+    FC_WIDTH,FC_WEIGHT,FC_FILE,FC_INDEX,(char *) NULL);
   if (object_set != (FcObjectSet *) NULL)
     {
       pattern=FcPatternCreate();
@@ -834,6 +826,9 @@ MagickExport MagickBooleanType LoadFontConfigFonts(SplayTreeInfo *type_cache,
     type_info->name=ConstantString(name);
     (void) SubstituteString(&type_info->name," ","-");
     type_info->family=ConstantString((const char *) family);
+    status=FcPatternGetInteger(font_set->fonts[i],FC_INDEX,0,&index);
+    if (status == FcResultMatch)
+      type_info->face=(size_t) index;
     status=FcPatternGetInteger(font_set->fonts[i],FC_SLANT,0,&slant);
     type_info->style=NormalStyle;
     if (slant == FC_SLANT_ITALIC)
@@ -941,12 +936,10 @@ static MagickBooleanType IsTypeTreeInstantiated(ExceptionInfo *exception)
 */
 MagickExport MagickBooleanType ListTypeInfo(FILE *file,ExceptionInfo *exception)
 {
-  char
-    weight[MagickPathExtent];
-
   const char
     *family,
     *glyphs,
+    *metrics,
     *name,
     *path,
     *stretch,
@@ -967,7 +960,6 @@ MagickExport MagickBooleanType ListTypeInfo(FILE *file,ExceptionInfo *exception)
   type_info=GetTypeInfoList("*",&number_fonts,exception);
   if (type_info == (const TypeInfo **) NULL)
     return(MagickFalse);
-  *weight='\0';
   path=(const char *) NULL;
   for (i=0; i < (ssize_t) number_fonts; i++)
   {
@@ -978,25 +970,30 @@ MagickExport MagickBooleanType ListTypeInfo(FILE *file,ExceptionInfo *exception)
          (type_info[i]->path != (char *) NULL))
       (void) FormatLocaleFile(file,"\nPath: %s\n",type_info[i]->path);
     path=type_info[i]->path;
-    name="unknown";
+    name="not defined";
     if (type_info[i]->name != (char *) NULL)
       name=type_info[i]->name;
-    family="unknown";
+    family="not defined";
     if (type_info[i]->family != (char *) NULL)
       family=type_info[i]->family;
     style=CommandOptionToMnemonic(MagickStyleOptions,type_info[i]->style);
     stretch=CommandOptionToMnemonic(MagickStretchOptions,type_info[i]->stretch);
-    glyphs="unknown";
+    metrics="not defined";
+    if (type_info[i]->metrics != (char *) NULL)
+      metrics=type_info[i]->metrics;
+    glyphs="not defined";
     if (type_info[i]->glyphs != (char *) NULL)
       glyphs=type_info[i]->glyphs;
-    (void) FormatLocaleString(weight,MagickPathExtent,"%.20g",(double)
-      type_info[i]->weight);
     (void) FormatLocaleFile(file,"  Font: %s\n",name);
     (void) FormatLocaleFile(file,"    family: %s\n",family);
     (void) FormatLocaleFile(file,"    style: %s\n",style);
     (void) FormatLocaleFile(file,"    stretch: %s\n",stretch);
-    (void) FormatLocaleFile(file,"    weight: %s\n",weight);
+    (void) FormatLocaleFile(file,"    weight: %.20g\n",(double)
+      type_info[i]->weight);
+    (void) FormatLocaleFile(file,"    metrics: %s\n",metrics);
     (void) FormatLocaleFile(file,"    glyphs: %s\n",glyphs);
+    (void) FormatLocaleFile(file,"    index: %d\n",(int)
+      type_info[i]->face);
   }
   (void) fflush(file);
   type_info=(const TypeInfo **) RelinquishMagickMemory((void *) type_info);
@@ -1179,8 +1176,8 @@ static MagickBooleanType LoadTypeCache(SplayTreeInfo *cache,const char *xml,
                   sans_exception=DestroyExceptionInfo(sans_exception);
                   if (file_xml != (char *) NULL)
                     {
-                      status&=LoadTypeCache(cache,file_xml,path,depth+1,
-                        exception);
+                      status&=(MagickStatusType) LoadTypeCache(cache,file_xml,
+                        path,depth+1,exception);
                       file_xml=(char *) RelinquishMagickMemory(file_xml);
                     }
                 }
@@ -1263,8 +1260,7 @@ static MagickBooleanType LoadTypeCache(SplayTreeInfo *cache,const char *xml,
       {
         if (LocaleCompare((char *) keyword,"glyphs") == 0)
           {
-            if (SetTypeNodePath(filename,font_path,token,&type_info->glyphs) ==
-                MagickFalse)
+            if (SetTypeNodePath(filename,font_path,token,&type_info->glyphs) == MagickFalse)
               type_info=(TypeInfo *) DestroyTypeNode(type_info);
             break;
           }
@@ -1275,8 +1271,7 @@ static MagickBooleanType LoadTypeCache(SplayTreeInfo *cache,const char *xml,
       {
         if (LocaleCompare((char *) keyword,"metrics") == 0)
           {
-            if (SetTypeNodePath(filename,font_path,token,&type_info->metrics) ==
-                MagickFalse)
+            if (SetTypeNodePath(filename,font_path,token,&type_info->metrics) == MagickFalse)
               type_info=(TypeInfo *) DestroyTypeNode(type_info);
             break;
           }

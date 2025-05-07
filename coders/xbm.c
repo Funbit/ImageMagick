@@ -159,12 +159,12 @@ static int XBMInteger(Image *image,short int *hex_digits)
         value*=16;
         c&=0xff;
         if (value <= (unsigned int) ((INT_MAX-1)-hex_digits[c]))
-          value+=hex_digits[c];
+          value+=(unsigned int) hex_digits[c];
       }
     c=ReadBlobByte(image);
     if (c == EOF)
       return(-1);
-  } while (hex_digits[c] >= 0);
+  } while (hex_digits[c & 0xff] >= 0);
   return((int) value);
 }
 
@@ -187,24 +187,23 @@ static Image *ReadXBMImage(const ImageInfo *image_info,ExceptionInfo *exception)
   MagickBooleanType
     status;
 
-  ssize_t
-    i,
-    x;
+  MagickOffsetType
+    offset;
 
   Quantum
     *q;
-
-  unsigned char
-    *p;
 
   short int
     hex_digits[256];
 
   ssize_t
+    i,
+    x,
     y;
 
   unsigned char
-    *data;
+    *data,
+    *p;
 
   unsigned int
     bit,
@@ -258,18 +257,20 @@ static Image *ReadXBMImage(const ImageInfo *image_info,ExceptionInfo *exception)
     Scan until hex digits.
   */
   version=11;
+  offset=TellBlob(image);
   while (ReadBlobString(image,buffer) != (char *) NULL)
   {
     if (sscanf(buffer,"static short %1024s = {",name) == 1)
       version=10;
+    else if (sscanf(buffer,"static unsigned char %1024s = {",name) == 1)
+      version=11;
+    else if (sscanf(buffer,"static char %1024s = {",name) == 1)
+      version=11;
     else
-      if (sscanf(buffer,"static unsigned char %1024s = {",name) == 1)
-        version=11;
-      else
-        if (sscanf(buffer,"static char %1024s = {",name) == 1)
-          version=11;
-        else
-          continue;
+      {
+        offset=TellBlob(image);
+        continue;
+      }
     p=(unsigned char *) strrchr(name,'_');
     if (p == (unsigned char *) NULL)
       p=(unsigned char *) name;
@@ -300,6 +301,9 @@ static Image *ReadXBMImage(const ImageInfo *image_info,ExceptionInfo *exception)
   status=SetImageExtent(image,image->columns,image->rows,exception);
   if (status == MagickFalse)
     return(DestroyImageList(image));
+  p=(unsigned char *) strrchr(buffer,'{');
+  if (p != (unsigned char *) NULL)
+    (void) SeekBlob(image,offset+((char *) p-buffer)+1,SEEK_SET);
   /*
     Initialize hex values.
   */
@@ -396,7 +400,7 @@ static Image *ReadXBMImage(const ImageInfo *image_info,ExceptionInfo *exception)
       byte>>=1;
       if (bit == 8)
         bit=0;
-      q+=GetPixelChannels(image);
+      q+=(ptrdiff_t) GetPixelChannels(image);
     }
     if (SyncAuthenticPixels(image,exception) == MagickFalse)
       break;
@@ -407,7 +411,10 @@ static Image *ReadXBMImage(const ImageInfo *image_info,ExceptionInfo *exception)
   }
   data=(unsigned char *) RelinquishMagickMemory(data);
   (void) SyncImage(image,exception);
-  (void) CloseBlob(image);
+  if (CloseBlob(image) == MagickFalse)
+    status=MagickFalse;
+  if (status == MagickFalse)
+    return(DestroyImageList(image));
   return(GetFirstImageInList(image));
 }
 
@@ -444,6 +451,7 @@ ModuleExport size_t RegisterXBMImage(void)
   entry->decoder=(DecodeImageHandler *) ReadXBMImage;
   entry->encoder=(EncodeImageHandler *) WriteXBMImage;
   entry->magick=(IsImageFormatHandler *) IsXBM;
+  entry->flags|=CoderDecoderSeekableStreamFlag;
   entry->flags^=CoderAdjoinFlag;
   (void) RegisterMagickInfo(entry);
   return(MagickImageCoderSignature);
@@ -574,7 +582,7 @@ static MagickBooleanType WriteXBMImage(const ImageInfo *image_info,Image *image,
     for (x=0; x < (ssize_t) image->columns; x++)
     {
       byte>>=1;
-      if (GetPixelLuma(image,p) < (QuantumRange/2))
+      if (GetPixelLuma(image,p) < ((double) QuantumRange/2))
         byte|=0x80;
       bit++;
       if (bit == 8)
@@ -595,7 +603,7 @@ static MagickBooleanType WriteXBMImage(const ImageInfo *image_info,Image *image,
           bit=0;
           byte=0;
         }
-      p+=GetPixelChannels(image);
+      p+=(ptrdiff_t) GetPixelChannels(image);
     }
     if (bit != 0)
       {
@@ -623,6 +631,7 @@ static MagickBooleanType WriteXBMImage(const ImageInfo *image_info,Image *image,
   }
   (void) CopyMagickString(buffer,"};\n",MagickPathExtent);
   (void) WriteBlob(image,strlen(buffer),(unsigned char *) buffer);
-  (void) CloseBlob(image);
-  return(MagickTrue);
+  if (CloseBlob(image) == MagickFalse)
+    status=MagickFalse;
+  return(status);
 }

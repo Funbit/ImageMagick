@@ -16,7 +16,7 @@
 %                               March  2003                                   %
 %                                                                             %
 %                                                                             %
-%  Copyright @ 2003 ImageMagick Studio LLC, a non-profit organization         %
+%  Copyright @ 1999 ImageMagick Studio LLC, a non-profit organization         %
 %  dedicated to making software imaging solutions freely available.           %
 %                                                                             %
 %  You may not use this file except in compliance with the License.  You may  %
@@ -59,6 +59,7 @@
 #include "MagickCore/splay-tree.h"
 #include "MagickCore/statistic.h"
 #include "MagickCore/string_.h"
+#include "MagickCore/timer-private.h"
 
 #if defined(MAGICKCORE_CIPHER_SUPPORT)
 /*
@@ -80,7 +81,9 @@ typedef struct _AESInfo
     *decipher_key;
 
   ssize_t
-    rounds,
+    rounds;
+
+  time_t
     timestamp;
 
   size_t
@@ -203,7 +206,7 @@ static AESInfo *AcquireAESInfo(void)
       (aes_info->encipher_key == (unsigned int *) NULL) ||
       (aes_info->decipher_key == (unsigned int *) NULL))
     ThrowFatalException(ResourceLimitFatalError,"MemoryAllocationFailed");
-  aes_info->timestamp=(ssize_t) time(0);
+  aes_info->timestamp=GetMagickTime();
   aes_info->signature=MagickCoreSignature;
   return(aes_info);
 }
@@ -680,7 +683,7 @@ MagickExport MagickBooleanType PasskeyDecipherImage(Image *image,
       EncipherAESBlock(aes_info,output_block,output_block);
       for (i=0; i < AESBlocksize; i++)
         p[i]^=output_block[i];
-      p+=AESBlocksize;
+      p+=(ptrdiff_t) AESBlocksize;
     }
     (void) memcpy(output_block,input_block,AESBlocksize*
       sizeof(*output_block));
@@ -900,7 +903,7 @@ MagickExport MagickBooleanType PasskeyEncipherImage(Image *image,
       EncipherAESBlock(aes_info,output_block,output_block);
       for (i=0; i < AESBlocksize; i++)
         p[i]^=output_block[i];
-      p+=AESBlocksize;
+      p+=(ptrdiff_t) AESBlocksize;
     }
     (void) memcpy(output_block,input_block,AESBlocksize*
       sizeof(*output_block));
@@ -1057,7 +1060,7 @@ static void SetAESKey(AESInfo *aes_info,const StringInfo *key)
     aes_info->encipher_key[i]=aes_info->encipher_key[i-n] ^ alpha;
   }
   /*
-    Generate deciper key (in reverse order).
+    Generate decipher key (in reverse order).
   */
   for (i=0; i < 4; i++)
   {

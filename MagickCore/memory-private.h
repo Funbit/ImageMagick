@@ -49,7 +49,7 @@ static inline size_t OverAllocateMemory(const size_t length)
     extent;
 
   /*
-    Over allocate memory, typically used when concatentating strings.
+    Over allocate memory, typically used when concatenating strings.
   */
   extent=length;
   if (extent < 131072)
@@ -62,7 +62,9 @@ extern MagickPrivate MagickBooleanType
 
 extern MagickPrivate void
   ResetMaxMemoryRequest(void),
-  ResetVirtualAnonymousMemory(void);
+  ResetVirtualAnonymousMemory(void),
+  SetMaxMemoryRequest(const MagickSizeType),
+  SetMaxProfileSize(const MagickSizeType);
 
 #if defined(__cplusplus) || defined(c_plusplus)
 }

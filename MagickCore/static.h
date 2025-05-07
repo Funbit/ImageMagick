@@ -1,5 +1,5 @@
 /*
-  Copyright @ 2000 ImageMagick Studio LLC, a non-profit organization
+  Copyright @ 1999 ImageMagick Studio LLC, a non-profit organization
   dedicated to making software imaging solutions freely available.
 
   You may not use this file except in compliance with the License.  You may
@@ -149,6 +149,7 @@ extern ModuleExport size_t
   RegisterTIM2Image(void),
   RegisterTTFImage(void),
   RegisterTXTImage(void),
+  RegisterUHDRImage(void),
   RegisterUILImage(void),
   RegisterURLImage(void),
   RegisterUYVYImage(void),
@@ -289,6 +290,7 @@ extern ModuleExport void
   UnregisterTIM2Image(void),
   UnregisterTTFImage(void),
   UnregisterTXTImage(void),
+  UnregisterUHDRImage(void),
   UnregisterUILImage(void),
   UnregisterURLImage(void),
   UnregisterUYVYImage(void),

@@ -1,5 +1,5 @@
 /*
-  Copyright @ 2003 ImageMagick Studio LLC, a non-profit organization
+  Copyright @ 1999 ImageMagick Studio LLC, a non-profit organization
   dedicated to making software imaging solutions freely available.
   
   You may not use this file except in compliance with the License.  You may
@@ -79,7 +79,6 @@ typedef struct _MagickWand
 #include "MagickWand/compare.h"
 #include "MagickWand/composite.h"
 #include "MagickWand/conjure.h"
-#include "MagickWand/convert.h"
 #include "MagickWand/deprecate.h"
 #include "MagickWand/display.h"
 #include "MagickWand/drawing-wand.h"

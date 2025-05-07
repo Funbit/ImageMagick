@@ -17,7 +17,7 @@
 %                               February 2002                                 %
 %                                                                             %
 %                                                                             %
-%  Copyright @ 2002 ImageMagick Studio LLC, a non-profit organization         %
+%  Copyright @ 1999 ImageMagick Studio LLC, a non-profit organization         %
 %  dedicated to making software imaging solutions freely available.           %
 %                                                                             %
 %  You may not use this file except in compliance with the License.  You may  %
@@ -123,6 +123,7 @@ static Image *ReadCAPTIONImage(const ImageInfo *image_info,
     *image;
 
   MagickBooleanType
+    left_bearing,
     split,
     status;
 
@@ -168,7 +169,7 @@ static Image *ReadCAPTIONImage(const ImageInfo *image_info,
     return(DestroyImageList(image));
   (void) SetImageProperty(image,"caption",caption,exception);
   draw_info=CloneDrawInfo(image_info,(DrawInfo *) NULL);
-  width=(size_t) floor(0.5*draw_info->pointsize*strlen(caption)+0.5);
+  width=CastDoubleToUnsigned(0.5*draw_info->pointsize*strlen(caption)+0.5);
   if (AcquireMagickResource(WidthResource,width) == MagickFalse)
     {
       caption=DestroyString(caption);
@@ -276,19 +277,21 @@ static Image *ReadCAPTIONImage(const ImageInfo *image_info,
             if (status == MagickFalse)
               break;
             AdjustTypeMetricBounds(&metrics);
-            width=(size_t) floor(metrics.width+draw_info->stroke_width+0.5);
-            height=(size_t) floor(metrics.height+draw_info->interline_spacing+
-              draw_info->stroke_width+0.5);
+            width=CastDoubleToUnsigned(metrics.width+draw_info->stroke_width+
+              0.5);
+            height=CastDoubleToUnsigned(
+              metrics.height-metrics.underline_position+
+              draw_info->interline_spacing+draw_info->stroke_width+0.5);
             if ((image->columns != 0) && (image->rows != 0))
               {
-                if ((width >= image->columns) || (height >= image->rows))
+                if ((width > image->columns) && (height > image->rows))
                   break;
-                if ((width < image->columns) && (height < image->rows))
+                if ((width <= image->columns) && (height <= image->rows))
                   low=draw_info->pointsize;
               }
             else
-              if (((image->columns != 0) && (width >= image->columns)) ||
-                  ((image->rows != 0) && (height >= image->rows)))
+              if (((image->columns != 0) && (width > image->columns)) ||
+                  ((image->rows != 0) && (height > image->rows)))
                 break;
           }
           high=draw_info->pointsize;
@@ -309,24 +312,25 @@ static Image *ReadCAPTIONImage(const ImageInfo *image_info,
         if (status == MagickFalse)
           break;
         AdjustTypeMetricBounds(&metrics);
-        width=(size_t) floor(metrics.width+draw_info->stroke_width+0.5);
-        height=(size_t) floor(metrics.height+draw_info->interline_spacing+
-          draw_info->stroke_width+0.5);
+        width=CastDoubleToUnsigned(metrics.width+draw_info->stroke_width+0.5);
+        height=CastDoubleToUnsigned(metrics.height-metrics.underline_position+
+          draw_info->interline_spacing+draw_info->stroke_width+0.5);
         if ((image->columns != 0) && (image->rows != 0))
           {
-            if ((width < image->columns) && (height < image->rows))
+            if ((width <= image->columns) && (height <= image->rows))
               low=draw_info->pointsize+0.5;
             else
               high=draw_info->pointsize-0.5;
           }
         else
-          if (((image->columns != 0) && (width < image->columns)) ||
-              ((image->rows != 0) && (height < image->rows)))
+          if (((image->columns != 0) && (width <= image->columns)) ||
+              ((image->rows != 0) && (height <= image->rows)))
             low=draw_info->pointsize+0.5;
           else
             high=draw_info->pointsize-0.5;
       }
-      draw_info->pointsize=floor((low+high)/2.0-0.5);
+      if (status != MagickFalse)
+        draw_info->pointsize=floor(low-0.5);
     }
   /*
     Draw caption.
@@ -335,10 +339,16 @@ static Image *ReadCAPTIONImage(const ImageInfo *image_info,
   AdjustTypeMetricBounds(&metrics);
   (void) CloneString(&draw_info->text,caption);
   caption=DestroyString(caption);
+  left_bearing=((draw_info->gravity == UndefinedGravity) ||
+     (draw_info->gravity == NorthWestGravity) || 
+     (draw_info->gravity == WestGravity) ||
+     (draw_info->gravity == SouthWestGravity)) ? MagickTrue : MagickFalse;
   (void) FormatLocaleString(geometry,MagickPathExtent,"%+g%+g",
     (draw_info->direction == RightToLeftDirection ? (double) image->columns-
-    metrics.bounds.x2 : metrics.bounds.x1),(draw_info->gravity ==
-    UndefinedGravity ? MagickMax(metrics.ascent,metrics.bounds.y2) : 0.0));
+    (draw_info->gravity == UndefinedGravity ? metrics.bounds.x2 : 0.0) : 
+    (left_bearing != MagickFalse ? metrics.bounds.x1 : 0.0)),
+    (draw_info->gravity == UndefinedGravity ? 
+    MagickMax(metrics.ascent,metrics.bounds.y2) : 0.0));
   (void) CloneString(&draw_info->geometry,geometry);
   status=AnnotateImage(image,draw_info,exception);
   if (image_info->pointsize == 0.0)

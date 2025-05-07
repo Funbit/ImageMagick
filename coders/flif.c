@@ -17,7 +17,7 @@
 %                                April 2016                                   %
 %                                                                             %
 %                                                                             %
-%  Copyright @ 2016 ImageMagick Studio LLC, a non-profit organization         %
+%  Copyright @ 1999 ImageMagick Studio LLC, a non-profit organization         %
 %  dedicated to making software imaging solutions freely available.           %
 %                                                                             %
 %  You may not use this file except in compliance with the License.  You may  %
@@ -224,7 +224,7 @@ static Image *ReadFLIFImage(const ImageInfo *image_info,
         SetPixelGreen(image,ScaleShortToQuantum(*p++),q);
         SetPixelBlue(image,ScaleShortToQuantum(*p++),q);
         SetPixelAlpha(image,ScaleShortToQuantum(*p++),q);
-        q+=GetPixelChannels(image);
+        q+=(ptrdiff_t) GetPixelChannels(image);
       }
       if (SyncAuthenticPixels(image,exception) == MagickFalse)
         break;
@@ -380,6 +380,9 @@ ModuleExport void UnregisterFLIFImage(void)
 static MagickBooleanType WriteFLIFImage(const ImageInfo *image_info,
   Image *image, ExceptionInfo *exception)
 {
+  const Quantum
+    *magick_restrict p;
+
   FLIF_ENCODER
     *flifenc;
 
@@ -395,12 +398,6 @@ static MagickBooleanType WriteFLIFImage(const ImageInfo *image_info,
   MagickOffsetType
     scene;
 
-  const Quantum
-    *magick_restrict p;
-
-  ssize_t
-    x;
-
   unsigned char
     *magick_restrict qc;
 
@@ -409,17 +406,16 @@ static MagickBooleanType WriteFLIFImage(const ImageInfo *image_info,
 
   size_t
     columns,
-    imageListLength,
     length,
+    number_scenes,
     rows;
 
   ssize_t
+    x,
     y;
 
   void
-    *buffer;
-
-  void
+    *buffer,
     *pixels;
 
   assert(image_info != (const ImageInfo *) NULL);
@@ -470,7 +466,7 @@ static MagickBooleanType WriteFLIFImage(const ImageInfo *image_info,
       ThrowWriterException(ResourceLimitError,"MemoryAllocationFailed");
     }
   scene=0;
-  imageListLength=GetImageListLength(image);
+  number_scenes=GetImageListLength(image);
   do
   {
     for (y=0; y < (ssize_t) image->rows; y++)
@@ -491,13 +487,13 @@ static MagickBooleanType WriteFLIFImage(const ImageInfo *image_info,
               *qs++=ScaleQuantumToShort(GetPixelAlpha(image,p));
             else
               *qs++=0xFFFF;
-            p+=GetPixelChannels(image);
+            p+=(ptrdiff_t) GetPixelChannels(image);
           }
           flif_image_write_row_RGBA16(flifimage,y,pixels,length);
         }
       else
         {
-          qc=pixels;
+          qc=(unsigned char *) pixels;
           for (x=0; x < (ssize_t) image->columns; x++)
           {
             *qc++=ScaleQuantumToChar(GetPixelRed(image,p));
@@ -507,7 +503,7 @@ static MagickBooleanType WriteFLIFImage(const ImageInfo *image_info,
               *qc++=ScaleQuantumToChar(GetPixelAlpha(image,p));
             else
               *qc++=0xFF;
-            p+=GetPixelChannels(image);
+            p+=(ptrdiff_t) GetPixelChannels(image);
           }
           flif_image_write_row_RGBA8(flifimage,y,pixels,length);
         }
@@ -526,7 +522,7 @@ static MagickBooleanType WriteFLIFImage(const ImageInfo *image_info,
         ThrowWriterException(ImageError,"FramesNotSameDimensions");
       }
     scene++;
-    status=SetImageProgress(image,SaveImagesTag,scene,imageListLength);
+    status=SetImageProgress(image,SaveImagesTag,scene,number_scenes);
     if (status == MagickFalse)
        break;
   } while (image_info->adjoin != MagickFalse);

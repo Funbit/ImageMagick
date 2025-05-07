@@ -252,7 +252,7 @@ static MagickBooleanType WriteUILImage(const ImageInfo *image_info,Image *image,
               if (matte_image[i] != 0)
                 transparent=MagickTrue;
               i++;
-              p+=GetPixelChannels(image);
+              p+=(ptrdiff_t) GetPixelChannels(image);
             }
           }
         }
@@ -275,7 +275,7 @@ static MagickBooleanType WriteUILImage(const ImageInfo *image_info,Image *image,
               if (matte_image[i] != 0)
                 SetPixelIndex(image,(Quantum) image->colors,q);
               i++;
-              q+=GetPixelChannels(image);
+              q+=(ptrdiff_t) GetPixelChannels(image);
             }
           }
         }
@@ -330,7 +330,7 @@ static MagickBooleanType WriteUILImage(const ImageInfo *image_info,Image *image,
       (void) FormatLocaleString(buffer,MagickPathExtent,
         "    color('%s',%s) = '%s'",name,
         GetPixelInfoIntensity(image,image->colormap+i) <
-        (QuantumRange/2.0) ? "background" : "foreground",symbol);
+        ((double) QuantumRange/2.0) ? "background" : "foreground",symbol);
     (void) WriteBlobString(image,buffer);
     (void) FormatLocaleString(buffer,MagickPathExtent,"%s",
       (i == (ssize_t) (colors-1) ? ");\n" : ",\n"));
@@ -362,7 +362,7 @@ static MagickBooleanType WriteUILImage(const ImageInfo *image_info,Image *image,
       symbol[j]='\0';
       (void) CopyMagickString(buffer,symbol,MagickPathExtent);
       (void) WriteBlobString(image,buffer);
-      p+=GetPixelChannels(image);
+      p+=(ptrdiff_t) GetPixelChannels(image);
     }
     (void) FormatLocaleString(buffer,MagickPathExtent,"\"%s\n",
       (y == (ssize_t) (image->rows-1) ? ");" : ","));
@@ -373,6 +373,7 @@ static MagickBooleanType WriteUILImage(const ImageInfo *image_info,Image *image,
       break;
   }
   symbol=DestroyString(symbol);
-  (void) CloseBlob(image);
-  return(MagickTrue);
+  if (CloseBlob(image) == MagickFalse)
+    status=MagickFalse;
+  return(status);
 }

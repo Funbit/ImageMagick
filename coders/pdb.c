@@ -35,7 +35,7 @@
 %
 %
 %   20071202 TS * rewrote RLE decoder - old version could cause buffer overflows
-%               * failure of RLE decoding now thows error RLEDecoderError
+%               * failure of RLE decoding now throws error RLEDecoderError
 %               * fixed bug in RLE decoding - now all rows are decoded, not just
 %     the first one
 %   * fixed bug in reader - record offsets now handled correctly
@@ -88,10 +88,12 @@ typedef struct _PDBInfo
     attributes,
     version;
 
-  size_t
+  ssize_t
     create_time,
     modify_time,
-    archive_time,
+    archive_time;
+
+  size_t
     modify_number,
     application_info,
     sort_info;
@@ -476,7 +478,7 @@ static Image *ReadPDBImage(const ImageInfo *image_info,ExceptionInfo *exception)
         {
           index=(Quantum) (*p & (0x80 >> bit) ? 0x00 : 0x01);
           SetPixelIndex(image,index,q);
-          q+=GetPixelChannels(image);
+          q+=(ptrdiff_t) GetPixelChannels(image);
           bit++;
           if (bit == 8)
             {
@@ -514,7 +516,7 @@ static Image *ReadPDBImage(const ImageInfo *image_info,ExceptionInfo *exception)
           index=ConstrainColormapIndex(image,3UL-((*p >> shift) & 0x03),
             exception);
           SetPixelIndex(image,index,q);
-          q+=GetPixelChannels(image);
+          q+=(ptrdiff_t) GetPixelChannels(image);
           if (shift == 0)
             {
               shift=8;
@@ -551,7 +553,7 @@ static Image *ReadPDBImage(const ImageInfo *image_info,ExceptionInfo *exception)
           index=ConstrainColormapIndex(image,15UL-((*p >> shift) & 0x0f),
             exception);
           SetPixelIndex(image,index,q);
-          q+=GetPixelChannels(image);
+          q+=(ptrdiff_t) GetPixelChannels(image);
           if (shift == 0)
             {
               shift=8;
@@ -628,7 +630,10 @@ static Image *ReadPDBImage(const ImageInfo *image_info,ExceptionInfo *exception)
       (void) SetImageProperty(image,"comment",comment,exception);
       comment=DestroyString(comment);
     }
-  (void) CloseBlob(image);
+  if (CloseBlob(image) == MagickFalse)
+    status=MagickFalse;
+  if (status == MagickFalse)
+    return(DestroyImageList(image));
   return(GetFirstImageInList(image));
 }
 
@@ -913,8 +918,8 @@ static MagickBooleanType WritePDBImage(const ImageInfo *image_info,Image *image,
     for (x=0; x < (ssize_t) pdb_image.width; x++)
     {
       if (x < (ssize_t) image->columns)
-        buffer[literal+repeat]|=(0xff-scanline[x*packet_size]) >>
-          (8-bits_per_pixel) << bits*bits_per_pixel;
+        buffer[literal+repeat]|=(0xff-scanline[x*(ssize_t) packet_size]) >>
+          (8-bits_per_pixel) << bits*(ssize_t) bits_per_pixel;
       bits--;
       if (bits < 0)
         {
@@ -1007,6 +1012,7 @@ static MagickBooleanType WritePDBImage(const ImageInfo *image_info,Image *image,
   runlength=(unsigned char *) RelinquishMagickMemory(runlength);
   if (comment != (const char *) NULL)
     (void) WriteBlobString(image,comment);
-  (void) CloseBlob(image);
-  return(MagickTrue);
+  if (CloseBlob(image) == MagickFalse)
+    status=MagickFalse;
+  return(status);
 }

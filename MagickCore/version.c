@@ -43,6 +43,7 @@
 #include "MagickCore/linked-list.h"
 #include "MagickCore/locale_.h"
 #include "MagickCore/option.h"
+#include "MagickCore/pixel.h"
 #include "MagickCore/string_.h"
 #include "MagickCore/utility.h"
 #include "MagickCore/utility-private.h"
@@ -99,120 +100,133 @@ MagickExport const char *GetMagickCopyright(void)
 */
 MagickExport const char *GetMagickDelegates(void)
 {
-  return ""
+  static const char
+    *delegates=""
 #if defined(MAGICKCORE_AUTOTRACE_DELEGATE)
-  "autotrace "
+  " autotrace"
 #endif
 #if defined(MAGICKCORE_BZLIB_DELEGATE)
-  "bzlib "
+  " bzlib"
 #endif
 #if defined(MAGICKCORE_CAIRO_DELEGATE)
-  "cairo "
+  " cairo"
+#endif
+#if defined(MAGICKCORE_DMR_DELEGATE)
+  " dmr"
 #endif
 #if defined(MAGICKCORE_DJVU_DELEGATE)
-  "djvu "
+  " djvu"
 #endif
 #if defined(MAGICKCORE_DPS_DELEGATE)
-  "dps "
+  " dps"
 #endif
 #if defined(MAGICKCORE_EMF_DELEGATE)
-  "emf "
+  " emf"
 #endif
 #if defined(MAGICKCORE_FFTW_DELEGATE)
-  "fftw "
+  " fftw"
 #endif
 #if defined(MAGICKCORE_FLIF_DELEGATE)
-  "flif "
+  " flif"
 #endif
 #if defined(MAGICKCORE_FONTCONFIG_DELEGATE)
-  "fontconfig "
+  " fontconfig"
 #endif
 #if defined(MAGICKCORE_FPX_DELEGATE)
-  "fpx "
+  " fpx"
 #endif
 #if defined(MAGICKCORE_FREETYPE_DELEGATE)
-  "freetype "
+  " freetype"
 #endif
 #if defined(MAGICKCORE_GS_DELEGATE) || defined(MAGICKCORE_WINDOWS_SUPPORT)
-  "gslib "
+  " gslib"
 #endif
 #if defined(MAGICKCORE_GVC_DELEGATE)
-  "gvc "
+  " gvc"
 #endif
 #if defined(MAGICKCORE_HEIC_DELEGATE)
-  "heic "
+  " heic"
 #endif
 #if defined(MAGICKCORE_JBIG_DELEGATE)
-  "jbig "
+  " jbig"
 #endif
 #if defined(MAGICKCORE_JPEG_DELEGATE) && defined(MAGICKCORE_PNG_DELEGATE)
-  "jng "
+  " jng"
 #endif
 #if defined(MAGICKCORE_LIBOPENJP2_DELEGATE)
-  "jp2 "
+  " jp2"
 #endif
 #if defined(MAGICKCORE_JPEG_DELEGATE)
-  "jpeg "
+  " jpeg"
 #endif
 #if defined(MAGICKCORE_JXL_DELEGATE)
-  "jxl "
+  " jxl"
 #endif
 #if defined(MAGICKCORE_LCMS_DELEGATE)
-  "lcms "
+  " lcms"
 #endif
 #if defined(MAGICKCORE_LQR_DELEGATE)
-  "lqr "
+  " lqr"
 #endif
 #if defined(MAGICKCORE_LTDL_DELEGATE)
-  "ltdl "
+  " ltdl"
 #endif
 #if defined(MAGICKCORE_LZMA_DELEGATE)
-  "lzma "
+  " lzma"
 #endif
 #if defined(MAGICKCORE_OPENEXR_DELEGATE)
-  "openexr "
+  " openexr"
 #endif
 #if defined(MAGICKCORE_PANGOCAIRO_DELEGATE)
-  "pangocairo "
+  " pangocairo"
 #endif
 #if defined(MAGICKCORE_PNG_DELEGATE)
-  "png "
+  " png"
 #endif
 #if defined(MAGICKCORE_DPS_DELEGATE) || defined(MAGICKCORE_GS_DELEGATE) || \
     defined(MAGICKCORE_WINDOWS_SUPPORT)
-  "ps "
+  " ps"
 #endif
 #if defined(MAGICKCORE_RAQM_DELEGATE)
-  "raqm "
+  " raqm"
 #endif
 #if defined(MAGICKCORE_RAW_R_DELEGATE)
-  "raw "
+  " raw"
 #endif
 #if defined(MAGICKCORE_RSVG_DELEGATE)
-  "rsvg "
+  " rsvg"
 #endif
 #if defined(MAGICKCORE_TIFF_DELEGATE)
-  "tiff "
+  " tiff"
+#endif
+#if defined(MAGICKCORE_UHDR_DELEGATE)
+  " uhdr"
 #endif
 #if defined(MAGICKCORE_WEBP_DELEGATE)
-  "webp "
+  " webp"
 #endif
 #if defined(MAGICKCORE_WMF_DELEGATE) || defined (MAGICKCORE_WMFLITE_DELEGATE)
-  "wmf "
+  " wmf"
 #endif
 #if defined(MAGICKCORE_X11_DELEGATE)
-  "x "
+  " x"
 #endif
 #if defined(MAGICKCORE_XML_DELEGATE)
-  "xml "
+  " xml"
 #endif
 #if defined(MAGICKCORE_ZIP_DELEGATE)
-  "zip "
+  " zip"
 #endif
 #if defined(MAGICKCORE_ZLIB_DELEGATE)
-  "zlib"
+  " zlib"
+#endif
+#if defined(MAGICKCORE_ZSTD_DELEGATE)
+  " zstd"
 #endif
   ;
+  if (*delegates == '\0')
+    return(delegates);
+  return(delegates+1);
 }
 
 /*
@@ -241,10 +255,13 @@ MagickExport const char *GetMagickFeatures(void)
 #if defined(MAGICKCORE_WINDOWS_SUPPORT) && defined(_DEBUG)
   "Debug "
 #endif
+#if defined(MAGICKCORE_64BIT_CHANNEL_MASK_SUPPORT)
+  "Channel-masks(64-bit) "
+#endif
 #if defined(MAGICKCORE_CIPHER_SUPPORT)
   "Cipher "
 #endif
-#if defined(MAGICKCORE_WINDOWS_SUPPORT) || defined(MAGICKCORE_HAVE_SOCKET) && defined(MAGICKCORE_THREAD_SUPPORT)
+#if defined(MAGICKCORE_DPC_SUPPORT)
   "DPC "
 #endif
 #if defined(MAGICKCORE_HDRI_SUPPORT)
@@ -281,7 +298,7 @@ MagickExport const char *GetMagickFeatures(void)
 #if defined(MAGICKCORE_HAVE_TCMALLOC)
   "TCMalloc "
 #endif
-#if defined(ZERO_CONFIGURATION_SUPPORT)
+#if MAGICKCORE_ZERO_CONFIGURATION_SUPPORT
   "Zero-configuration "
 #endif
 #if (MAGICKCORE_QUANTUM_DEPTH == 64)
@@ -486,8 +503,8 @@ MagickExport const char *GetMagickReleaseDate(void)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  GetMagickSignature() returns a signature that uniquely encodes the
-%  MagickCore libary version, quantum depth, HDRI status, OS word size, and
-%  endianness.
+%  MagickCore library version, quantum depth, HDRI status, OS word size,
+%  channel type, and endianness.
 %
 %  The format of the GetMagickSignature method is:
 %
@@ -557,17 +574,22 @@ MagickExport unsigned int GetMagickSignature(const StringInfo *nonce)
   p=GetStringInfoDatum(version);
   signature=MAGICKCORE_QUANTUM_DEPTH;
   (void) memcpy(p,&signature,sizeof(signature));
-  p+=sizeof(signature);
+  p+=(ptrdiff_t) sizeof(signature);
   signature=MAGICKCORE_HDRI_ENABLE;
   (void) memcpy(p,&signature,sizeof(signature));
-  p+=sizeof(signature);
+  p+=(ptrdiff_t) sizeof(signature);
   signature=MagickLibInterface;
   (void) memcpy(p,&signature,sizeof(signature));
-  p+=sizeof(signature);
+  p+=(ptrdiff_t) sizeof(signature);
   signature=1;  /* endianness */
   (void) memcpy(p,&signature,sizeof(signature));
-  p+=sizeof(signature);
-  SetStringInfoLength(version,p-GetStringInfoDatum(version));
+  p+=(ptrdiff_t) sizeof(signature);
+#if defined(MAGICKCORE_64BIT_CHANNEL_MASK_SUPPORT)
+  signature=sizeof(ChannelType);
+  (void) memcpy(p,&signature,sizeof(signature));
+  p+=(ptrdiff_t) sizeof(signature);
+#endif
+  SetStringInfoLength(version,(size_t) (p-GetStringInfoDatum(version)));
   if (nonce != (const StringInfo *) NULL)
     ConcatenateStringInfo(version,nonce);
   signature=CRC32(GetStringInfoDatum(version),GetStringInfoLength(version));
@@ -641,12 +663,12 @@ MagickExport void ListMagickVersion(FILE *file)
 #if defined(MAGICKCORE_MSC_VER)
   (void) FormatLocaleFile(file,"Compiler: Visual Studio %d (%d)\n",
     MAGICKCORE_MSC_VER,_MSC_FULL_VER);
-#elif defined(__GNUC__)
-  (void) FormatLocaleFile(file,"Compiler: gcc (%d.%d)\n",__GNUC__,
-    __GNUC_MINOR__);
 #elif defined(__clang__)
   (void) FormatLocaleFile(file,"Compiler: clang (%d.%d.%d)\n",__clang_major__,
     __clang_minor__,__clang_patchlevel__);
+#elif defined(__GNUC__)
+  (void) FormatLocaleFile(file,"Compiler: gcc (%d.%d)\n",__GNUC__,
+    __GNUC_MINOR__);
 #elif defined(__MINGW32_MAJOR_VERSION)
   (void) FormatLocaleFile(file,"Compiler: MinGW (%d.%d)\n",
     __MINGW32_MAJOR_VERSION,__MINGW32_MINOR_VERSION);

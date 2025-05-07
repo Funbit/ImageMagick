@@ -57,7 +57,8 @@ typedef enum
 {
   UndefinedDirection,
   RightToLeftDirection,
-  LeftToRightDirection
+  LeftToRightDirection,
+  TopToBottomDirection
 } DirectionType;
 
 typedef enum
@@ -350,6 +351,9 @@ typedef struct _DrawInfo
 
   WordBreakType
     word_break;
+
+  ImageInfo
+    *image_info;
 } DrawInfo;
 
 typedef struct _PrimitiveInfo

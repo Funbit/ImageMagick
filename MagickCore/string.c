@@ -52,7 +52,9 @@
 #include "MagickCore/memory-private.h"
 #include "MagickCore/nt-base-private.h"
 #include "MagickCore/property.h"
+#include "MagickCore/policy.h"
 #include "MagickCore/resource_.h"
+#include "MagickCore/resource-private.h"
 #include "MagickCore/signature-private.h"
 #include "MagickCore/string_.h"
 #include "MagickCore/string-private.h"
@@ -80,7 +82,7 @@
 %  An extended string is the string length, plus an extra MagickPathExtent space
 %  to allow for the string to be actively worked on.
 %
-%  The returned string shoud be freed using DestoryString().
+%  The returned string should be freed using DestroyString().
 %
 %  The format of the AcquireString method is:
 %
@@ -137,7 +139,7 @@ MagickExport char *AcquireString(const char *source)
 %
 */
 
-static StringInfo *AcquireStringInfoContainer()
+static StringInfo *AcquireStringInfoContainer(void)
 {
   StringInfo
     *string_info;
@@ -233,7 +235,7 @@ MagickExport StringInfo *BlobToStringInfo(const void *blob,const size_t length)
 %  If source is a NULL pointer the destination string will be freed and set to
 %  a NULL pointer.  A pointer to the stored in the destination is also returned.
 %
-%  When finished the non-NULL string should be freed using DestoryString()
+%  When finished the non-NULL string should be freed using DestroyString()
 %  or using CloneString() with a NULL pointed for the source.
 %
 %  The format of the CloneString method is:
@@ -399,10 +401,8 @@ MagickExport size_t ConcatenateMagickString(char *magick_restrict destination,
     *magick_restrict p;
 
   size_t
+    count,
     i;
-
-  size_t
-    count;
 
   assert(destination != (char *) NULL);
   assert(source != (const char *) NULL);
@@ -426,7 +426,7 @@ MagickExport size_t ConcatenateMagickString(char *magick_restrict destination,
     p++;
   }
   *q='\0';
-  return(count+(p-source));
+  return(count+(size_t) (p-source));
 }
 
 /*
@@ -539,7 +539,8 @@ MagickExport void ConcatenateStringInfo(StringInfo *string_info,
       sizeof(*string_info->datum));
   if (string_info->datum == (unsigned char *) NULL)
     ThrowFatalException(ResourceLimitFatalError,"MemoryAllocationFailed");
-  (void) memcpy(string_info->datum+string_info->length,source->datum,source->length);
+  (void) memcpy(string_info->datum+string_info->length,source->datum,
+    source->length);
   string_info->length=length;
 }
 
@@ -622,10 +623,10 @@ MagickExport StringInfo *ConfigureFileToStringInfo(const char *filename)
         count;
 
       (void) lseek(file,0,SEEK_SET);
-      for (i=0; i < length; i+=count)
+      for (i=0; i < length; i+=(size_t) count)
       {
         count=read(file,string+i,(size_t) MagickMin(length-i,(size_t)
-          MAGICK_SSIZE_MAX));
+          MagickMaxBufferExtent));
         if (count <= 0)
           {
             count=0;
@@ -664,7 +665,7 @@ MagickExport StringInfo *ConfigureFileToStringInfo(const char *filename)
 %  copies the source string to that memory location.  A NULL string pointer
 %  will allocate an empty string containing just the NUL character.
 %
-%  When finished the string should be freed using DestoryString()
+%  When finished the string should be freed using DestroyString()
 %
 %  The format of the ConstantString method is:
 %
@@ -965,6 +966,9 @@ MagickExport char *EscapeString(const char *source,const char escape)
 MagickExport char *FileToString(const char *filename,const size_t extent,
   ExceptionInfo *exception)
 {
+  const char
+    *p;
+
   size_t
     length;
 
@@ -972,7 +976,23 @@ MagickExport char *FileToString(const char *filename,const size_t extent,
   assert(exception != (ExceptionInfo *) NULL);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",filename);
-  return((char *) FileToBlob(filename,extent,&length,exception));
+  p=filename;
+  if ((*filename == '@') && (strlen(filename) > 1))
+    {
+      MagickBooleanType
+        status;
+
+      status=IsRightsAuthorized(PathPolicyDomain,ReadPolicyRights,filename);
+      if (status == MagickFalse)
+        {
+          errno=EPERM;
+          (void) ThrowMagickException(exception,GetMagickModule(),PolicyError,
+            "NotAuthorized","`%s'",filename);
+          return((char *) NULL);
+        }
+      p=filename+1;
+    }
+  return((char *) FileToBlob(p,extent,&length,exception));
 }
 
 /*
@@ -1061,10 +1081,6 @@ MagickExport ssize_t FormatMagickSize(const MagickSizeType size,
   const MagickBooleanType bi,const char *suffix,const size_t length,
   char *format)
 {
-  char
-    p[MagickPathExtent],
-    q[MagickPathExtent];
-
   const char
     **units;
 
@@ -1081,11 +1097,11 @@ MagickExport ssize_t FormatMagickSize(const MagickSizeType size,
   static const char
     *bi_units[] =
     {
-      "", "Ki", "Mi", "Gi", "Ti", "Pi", "Ei", "Zi", "Yi", (char *) NULL
+      "", "Ki", "Mi", "Gi", "Ti", "Pi", "Ei", "Zi", "Yi", "Ri", "Qi", (char *) NULL
     },
     *traditional_units[] =
     {
-      "", "K", "M", "G", "T", "P", "E", "Z", "Y", (char *) NULL
+      "", "K", "M", "G", "T", "P", "E", "Z", "Y", "R", "Q", (char *) NULL
     };
 
   bytes=1000.0;
@@ -1096,10 +1112,9 @@ MagickExport ssize_t FormatMagickSize(const MagickSizeType size,
       units=bi_units;
     }
   extent=(double) size;
-  (void) FormatLocaleString(p,MagickPathExtent,"%.*g",GetMagickPrecision(),
-    extent);
-  (void) FormatLocaleString(q,MagickPathExtent,"%.20g",extent);
-  if (strtod(p,(char **) NULL) == strtod(q,(char **) NULL))
+  (void) FormatLocaleString(format,MagickFormatExtent,"%.*g",
+    GetMagickPrecision(),extent);
+  if (strstr(format,"e+") == (char *) NULL)
     {
       if (suffix == (const char *) NULL)
         count=FormatLocaleString(format,length,"%.20g%s",extent,units[0]);
@@ -1144,6 +1159,9 @@ MagickExport ssize_t FormatMagickSize(const MagickSizeType size,
 */
 MagickExport char *GetEnvironmentValue(const char *name)
 {
+#if defined(MAGICKCORE_WINDOWS_SUPPORT)
+  return(NTGetEnvironmentValue(name));
+#else
   const char
     *environment;
 
@@ -1151,6 +1169,7 @@ MagickExport char *GetEnvironmentValue(const char *name)
   if (environment == (const char *) NULL)
     return((char *) NULL);
   return(ConstantString(environment));
+#endif
 }
 
 /*
@@ -1286,18 +1305,18 @@ MagickExport const char *GetStringInfoPath(const StringInfo *string_info)
 %
 %  The format of the InterpretSiPrefixValue method is:
 %
-%      double InterpretSiPrefixValue(const char *value,char **sentinal)
+%      double InterpretSiPrefixValue(const char *value,char **sentinel)
 %
 %  A description of each parameter follows:
 %
 %    o value: the string value.
 %
-%    o sentinal:  if sentinal is not NULL, return a pointer to the character
+%    o sentinel:  if sentinel is not NULL, return a pointer to the character
 %      after the last character used in the conversion.
 %
 */
 MagickExport double InterpretSiPrefixValue(const char *magick_restrict string,
-  char **magick_restrict sentinal)
+  char **magick_restrict sentinel)
 {
   char
     *q;
@@ -1315,6 +1334,8 @@ MagickExport double InterpretSiPrefixValue(const char *magick_restrict string,
 
           switch ((int) ((unsigned char) *q))
           {
+            case 'q': e=(-30.0); break;
+            case 'r': e=(-27.0); break;
             case 'y': e=(-24.0); break;
             case 'z': e=(-21.0); break;
             case 'a': e=(-18.0); break;
@@ -1335,6 +1356,8 @@ MagickExport double InterpretSiPrefixValue(const char *magick_restrict string,
             case 'E': e=18.0; break;
             case 'Z': e=21.0; break;
             case 'Y': e=24.0; break;
+            case 'R': e=27.0; break;
+            case 'Q': e=30.0; break;
             default: e=0.0; break;
           }
           if (e >= MagickEpsilon)
@@ -1342,7 +1365,7 @@ MagickExport double InterpretSiPrefixValue(const char *magick_restrict string,
               if (q[1] == 'i')
                 {
                   value*=pow(2.0,e/0.3);
-                  q+=2;
+                  q+=(ptrdiff_t) 2;
                 }
               else
                 {
@@ -1354,8 +1377,8 @@ MagickExport double InterpretSiPrefixValue(const char *magick_restrict string,
       if ((*q == 'B') || (*q == 'P'))
         q++;
     }
-  if (sentinal != (char **) NULL)
-    *sentinal=q;
+  if (sentinel != (char **) NULL)
+    *sentinel=q;
   return(value);
 }
 
@@ -1603,7 +1626,7 @@ MagickExport char *SanitizeString(const char *source)
   sanitize_source=AcquireString(source);
   p=sanitize_source;
   q=sanitize_source+strlen(sanitize_source);
-  for (p+=strspn(p,allowlist); p != q; p+=strspn(p,allowlist))
+  for (p+=strspn(p,allowlist); p != q; p+=(ptrdiff_t) strspn(p,allowlist))
     *p='_';
   return(sanitize_source);
 }
@@ -2053,7 +2076,7 @@ MagickExport char **StringToArgv(const char *text,int *argc)
       p++;
   }
   (*argc)++;
-  argv=(char **) AcquireQuantumMemory((size_t) (*argc+1UL),sizeof(*argv));
+  argv=(char **) AcquireQuantumMemory((size_t) *argc+1UL,sizeof(*argv));
   if (argv == (char **) NULL)
     ThrowFatalException(ResourceLimitFatalError,"UnableToConvertStringToARGV");
   /*
@@ -2113,7 +2136,7 @@ MagickExport char **StringToArgv(const char *text,int *argc)
 %
 %  StringToArrayOfDoubles() converts a string of space or comma separated
 %  numbers into array of floating point numbers (doubles). Any number that
-%  failes to parse properly will produce a syntax error. As will two commas
+%  fails to parse properly will produce a syntax error. As will two commas
 %  without a  number between them.  However a final comma at the end will
 %  not be regarded as an error so as to simplify automatic list generation.
 %
@@ -2422,7 +2445,7 @@ MagickExport char **StringToStrings(const char *text,size_t *count)
         {
           (void) FormatLocaleString(hex_string,MagickPathExtent,"%02x",*(p+j));
           (void) CopyMagickString(q,hex_string,MagickPathExtent);
-          q+=2;
+          q+=(ptrdiff_t) 2;
           if ((j % 0x04) == 0)
             *q++=' ';
         }
@@ -2634,7 +2657,7 @@ MagickExport MagickBooleanType SubstituteString(char **string,
       (void) memmove(p+replace_extent,p+search_extent,
         strlen(p+search_extent)+1);
     (void) memcpy(p,replace,replace_extent);
-    p+=replace_extent-1;
+    p+=(ptrdiff_t) replace_extent-1;
   }
   return(status);
 }

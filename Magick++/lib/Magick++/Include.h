@@ -32,10 +32,6 @@
 #include <errno.h>
 #include <stdint.h>
 
-#if defined(__BORLANDC__)
-#  include <vcl.h> /* Borland C++ Builder 4.0 requirement */
-#endif // defined(__BORLANDC__)
-
 //
 // Include ImageMagick headers into namespace "MagickCore". If
 // MAGICKCORE_IMPLEMENTATION is defined, include ImageMagick development
@@ -86,7 +82,7 @@ namespace MagickCore
 #      endif
 #      define MagickPPPrivate extern __declspec(dllimport)
 #    else
-#      if defined(__BORLANDC__) || defined(__MINGW32__)
+#      if defined(__MINGW32__)
 #        define MagickPPExport __declspec(dllexport)
 #        define MagickPPPrivate __declspec(dllexport)
 #      else
@@ -110,6 +106,7 @@ namespace MagickCore
 #          pragma comment(lib, "CORE_DB_cairo_.lib")
 #        endif
 #        if defined(MAGICKCORE_OPENEXR_DELEGATE)
+#          pragma comment(lib, "CORE_DB_deflate_.lib")
 #          pragma comment(lib, "CORE_DB_exr_.lib")
 #        endif
 #        if defined(MAGICKCORE_FLIF_DELEGATE)
@@ -122,7 +119,7 @@ namespace MagickCore
 #          pragma comment(lib, "CORE_DB_jbig_.lib")
 #        endif
 #        if defined(MAGICKCORE_JP2_DELEGATE)
-#          pragma comment(lib, "CORE_DB_jp2_.lib")
+#          pragma comment(lib, "CORE_DB_jasper_.lib")
 #        endif
 #        if defined(MAGICKCORE_JPEG_DELEGATE)
 #          pragma comment(lib, "CORE_DB_jpeg-turbo_.lib")
@@ -199,6 +196,7 @@ namespace MagickCore
 #          pragma comment(lib, "CORE_RL_cairo_.lib")
 #        endif
 #        if defined(MAGICKCORE_OPENEXR_DELEGATE)
+#          pragma comment(lib, "CORE_RL_deflate_.lib")
 #          pragma comment(lib, "CORE_RL_exr_.lib")
 #        endif
 #        if defined(MAGICKCORE_FLIF_DELEGATE)
@@ -211,7 +209,7 @@ namespace MagickCore
 #          pragma comment(lib, "CORE_RL_jbig_.lib")
 #        endif
 #        if defined(MAGICKCORE_JP2_DELEGATE)
-#          pragma comment(lib, "CORE_RL_jp2_.lib")
+#          pragma comment(lib, "CORE_RL_jasper_.lib")
 #        endif
 #        if defined(MAGICKCORE_JPEG_DELEGATE)
 #          pragma comment(lib, "CORE_RL_jpeg-turbo_.lib")

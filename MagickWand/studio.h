@@ -97,10 +97,6 @@ extern "C" {
 #if defined(MAGICKWAND_WINDOWS_SUPPORT) && defined(_DEBUG)
 #define _CRTDBG_MAP_ALLOC
 #endif
-
-#if defined(MAGICKWAND_WINDOWS_SUPPORT) && defined(_DEBUG)
-#define _CRTDBG_MAP_ALLOC
-#endif
 #if defined(MAGICKWAND_WINDOWS_SUPPORT)
 # include <io.h>
 #if !defined(__CYGWIN__)
@@ -135,11 +131,9 @@ extern "C" {
 #endif
 
 #if defined(MAGICKCORE_HAVE_CL_CL_H)
-#  include <CL/cl.h>
 #  define MAGICKCORE_OPENCL_SUPPORT  1
 #endif
 #if defined(MAGICKCORE_HAVE_OPENCL_CL_H)
-#  include <OpenCL/cl.h>
 #  define MAGICKCORE_OPENCL_SUPPORT  1
 #endif
 
@@ -296,8 +290,6 @@ extern int vsnprintf(char *,size_t,const char *,va_list);
 /*
   Magick defines.
 */
-#define MAGICK_SSIZE_MAX  (SSIZE_MAX)
-#define MAGICK_SSIZE_MIN  (-(SSIZE_MAX)-1)
 #if defined(_MSC_VER)
 # define DisableMSCWarning(nr) __pragma(warning(push)) \
   __pragma(warning(disable:nr))

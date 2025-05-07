@@ -17,7 +17,7 @@
 %                               September 2014                                %
 %                                                                             %
 %                                                                             %
-%  Copyright @ 2014 ImageMagick Studio LLC, a non-profit organization         %
+%  Copyright @ 1999 ImageMagick Studio LLC, a non-profit organization         %
 %  dedicated to making software imaging solutions freely available.           %
 %                                                                             %
 %  You may not use this file except in compliance with the License.  You may  %
@@ -129,17 +129,17 @@ static int CCObjectInfoCompare(const void *x,const void *y)
   if (p->key == -4)
     return((int) (q->bounding_box.x-(ssize_t) p->bounding_box.x));
   if (p->key == -3)
-    return((int) (q->bounding_box.height-(ssize_t) p->bounding_box.height));
+    return((int) (q->bounding_box.height-p->bounding_box.height));
   if (p->key == -2)
-    return((int) (q->bounding_box.width-(ssize_t) p->bounding_box.width));
+    return((int) (q->bounding_box.width-p->bounding_box.width));
   if (p->key == -1)
     return((int) (q->area-(ssize_t) p->area));
   if (p->key == 1)
     return((int) (p->area-(ssize_t) q->area));
   if (p->key == 2)
-    return((int) (p->bounding_box.width-(ssize_t) q->bounding_box.width));
+    return((int) (p->bounding_box.width-q->bounding_box.width));
   if (p->key == 3)
-    return((int) (p->bounding_box.height-(ssize_t) q->bounding_box.height));
+    return((int) (p->bounding_box.height-q->bounding_box.height));
   if (p->key == 4)
     return((int) (p->bounding_box.x-(ssize_t) q->bounding_box.x));
   if (p->key == 5)
@@ -182,7 +182,7 @@ static void PerimeterThreshold(const Image *component_image,
       continue;
     component_view=AcquireAuthenticCacheView(component_image,exception);
     bounding_box=object[i].bounding_box;
-    for (y=(-1); y < (ssize_t) bounding_box.height+1; y++)
+    for (y=(-1); y < (ssize_t) bounding_box.height; y++)
     {
       const Quantum
         *magick_restrict p;
@@ -197,16 +197,16 @@ static void PerimeterThreshold(const Image *component_image,
           status=MagickFalse;
           break;
         }
-      for (x=(-1); x < (ssize_t) bounding_box.width+1; x++)
+      for (x=(-1); x < (ssize_t) bounding_box.width; x++)
       {
         Quantum
           pixels[4];
 
-        ssize_t
-          v;
-
         size_t
           foreground;
+
+        ssize_t
+          v;
 
         /*
           An Algorithm for Calculating Objects’ Shape Features in Binary
@@ -223,9 +223,9 @@ static void PerimeterThreshold(const Image *component_image,
             ssize_t
               offset;
 
-            offset=v*(bounding_box.width+2)*
-              GetPixelChannels(component_image)+u*
-              GetPixelChannels(component_image);
+            offset=v*((ssize_t) bounding_box.width+2)*
+              (ssize_t) GetPixelChannels(component_image)+u*
+              (ssize_t) GetPixelChannels(component_image);
             pixels[2*v+u]=GetPixelIndex(component_image,p+offset);
             if ((ssize_t) pixels[2*v+u] == i)
               foreground++;
@@ -236,10 +236,8 @@ static void PerimeterThreshold(const Image *component_image,
         else
           if (foreground == 2)
             {
-              if ((((ssize_t) pixels[0] == i) &&
-                    ((ssize_t) pixels[3] == i)) ||
-                  (((ssize_t) pixels[1] == i) &&
-                    ((ssize_t) pixels[2] == i)))
+              if ((((ssize_t) pixels[0] == i) && ((ssize_t) pixels[3] == i)) ||
+                  (((ssize_t) pixels[1] == i) && ((ssize_t) pixels[2] == i)))
                 pattern[0]++;  /* diagonal */
               else
                 pattern[2]++;
@@ -247,7 +245,7 @@ static void PerimeterThreshold(const Image *component_image,
           else
             if (foreground == 3)
               pattern[3]++;
-        p+=GetPixelChannels(component_image);
+        p+=(ptrdiff_t) GetPixelChannels(component_image);
       }
     }
     component_view=DestroyCacheView(component_view);
@@ -332,9 +330,9 @@ static void CircularityThreshold(const Image *component_image,
             ssize_t
               offset;
 
-            offset=v*(bounding_box.width+2)*
-              GetPixelChannels(component_image)+u*
-              GetPixelChannels(component_image);
+            offset=v*((ssize_t) bounding_box.width+2)*
+              (ssize_t) GetPixelChannels(component_image)+u*
+              (ssize_t) GetPixelChannels(component_image);
             pixels[2*v+u]=GetPixelIndex(component_image,p+offset);
             if ((ssize_t) pixels[2*v+u] == i)
               foreground++;
@@ -345,10 +343,8 @@ static void CircularityThreshold(const Image *component_image,
         else
           if (foreground == 2)
             {
-              if ((((ssize_t) pixels[0] == i) &&
-                    ((ssize_t) pixels[3] == i)) ||
-                  (((ssize_t) pixels[1] == i) &&
-                    ((ssize_t) pixels[2] == i)))
+              if ((((ssize_t) pixels[0] == i) && ((ssize_t) pixels[3] == i)) ||
+                  (((ssize_t) pixels[1] == i) && ((ssize_t) pixels[2] == i)))
                 pattern[0]++;  /* diagonal */
               else
                 pattern[2]++;
@@ -356,7 +352,7 @@ static void CircularityThreshold(const Image *component_image,
           else
             if (foreground == 3)
               pattern[3]++;
-        p+=GetPixelChannels(component_image);
+        p+=(ptrdiff_t) GetPixelChannels(component_image);
       }
     }
     component_view=DestroyCacheView(component_view);
@@ -433,7 +429,7 @@ static void MajorAxisThreshold(const Image *component_image,
             M10+=x;
             M01+=y;
           }
-        p+=GetPixelChannels(component_image);
+        p+=(ptrdiff_t) GetPixelChannels(component_image);
       }
     }
     centroid.x=M10*PerceptibleReciprocal(M00);
@@ -457,7 +453,7 @@ static void MajorAxisThreshold(const Image *component_image,
             M20+=(x-centroid.x)*(x-centroid.x);
             M02+=(y-centroid.y)*(y-centroid.y);
           }
-        p+=GetPixelChannels(component_image);
+        p+=(ptrdiff_t) GetPixelChannels(component_image);
       }
     }
     component_view=DestroyCacheView(component_view);
@@ -532,7 +528,7 @@ static void MinorAxisThreshold(const Image *component_image,
             M10+=x;
             M01+=y;
           }
-        p+=GetPixelChannels(component_image);
+        p+=(ptrdiff_t) GetPixelChannels(component_image);
       }
     }
     centroid.x=M10*PerceptibleReciprocal(M00);
@@ -556,7 +552,7 @@ static void MinorAxisThreshold(const Image *component_image,
             M20+=(x-centroid.x)*(x-centroid.x);
             M02+=(y-centroid.y)*(y-centroid.y);
           }
-        p+=GetPixelChannels(component_image);
+        p+=(ptrdiff_t) GetPixelChannels(component_image);
       }
     }
     component_view=DestroyCacheView(component_view);
@@ -632,7 +628,7 @@ static void EccentricityThreshold(const Image *component_image,
             M10+=x;
             M01+=y;
           }
-        p+=GetPixelChannels(component_image);
+        p+=(ptrdiff_t) GetPixelChannels(component_image);
       }
     }
     centroid.x=M10*PerceptibleReciprocal(M00);
@@ -656,7 +652,7 @@ static void EccentricityThreshold(const Image *component_image,
             M20+=(x-centroid.x)*(x-centroid.x);
             M02+=(y-centroid.y)*(y-centroid.y);
           }
-        p+=GetPixelChannels(component_image);
+        p+=(ptrdiff_t) GetPixelChannels(component_image);
       }
     }
     component_view=DestroyCacheView(component_view);
@@ -735,7 +731,7 @@ static void AngleThreshold(const Image *component_image,
             M10+=x;
             M01+=y;
           }
-        p+=GetPixelChannels(component_image);
+        p+=(ptrdiff_t) GetPixelChannels(component_image);
       }
     }
     centroid.x=M10*PerceptibleReciprocal(M00);
@@ -759,7 +755,7 @@ static void AngleThreshold(const Image *component_image,
             M20+=(x-centroid.x)*(x-centroid.x);
             M02+=(y-centroid.y)*(y-centroid.y);
           }
-        p+=GetPixelChannels(component_image);
+        p+=(ptrdiff_t) GetPixelChannels(component_image);
       }
     }
     component_view=DestroyCacheView(component_view);
@@ -919,7 +915,7 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
           status=MagickFalse;
           continue;
         }
-      p+=GetPixelChannels(image)*image->columns;
+      p+=(ptrdiff_t) GetPixelChannels(image)*image->columns;
       for (x=0; x < (ssize_t) image->columns; x++)
       {
         PixelInfo
@@ -941,22 +937,22 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
         if (((x+dx) < 0) || ((x+dx) >= (ssize_t) image->columns) ||
             ((y+dy) < 0) || ((y+dy) >= (ssize_t) image->rows))
           {
-            p+=GetPixelChannels(image);
+            p+=(ptrdiff_t) GetPixelChannels(image);
             continue;
           }
-        neighbor_offset=dy*(GetPixelChannels(image)*image->columns)+dx*
-          GetPixelChannels(image);
+        neighbor_offset=dy*((ssize_t) GetPixelChannels(image)*(ssize_t)
+          image->columns)+dx*(ssize_t) GetPixelChannels(image);
         GetPixelInfoPixel(image,p+neighbor_offset,&target);
         if (IsFuzzyEquivalencePixelInfo(&pixel,&target) == MagickFalse)
           {
-            p+=GetPixelChannels(image);
+            p+=(ptrdiff_t) GetPixelChannels(image);
             continue;
           }
         /*
           Resolve this equivalence.
         */
-        offset=y*image->columns+x;
-        neighbor_offset=dy*image->columns+dx;
+        offset=y*(ssize_t) image->columns+x;
+        neighbor_offset=dy*(ssize_t) image->columns+dx;
         ox=offset;
         status=GetMatrixElement(equivalences,ox,0,&obj);
         while (obj != ox)
@@ -995,8 +991,9 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
           status=GetMatrixElement(equivalences,oy,0,&obj);
           status=SetMatrixElement(equivalences,oy,0,&root);
         }
-        status=SetMatrixElement(equivalences,y*image->columns+x,0,&root);
-        p+=GetPixelChannels(image);
+        status=SetMatrixElement(equivalences,y*(ssize_t) image->columns+x,0,
+          &root);
+        p+=(ptrdiff_t) GetPixelChannels(image);
       }
     }
   }
@@ -1032,7 +1029,7 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
         id,
         offset;
 
-      offset=y*image->columns+x;
+      offset=y*(ssize_t) image->columns+x;
       status=GetMatrixElement(equivalences,offset,0,&id);
       if (id != offset)
         status=GetMatrixElement(equivalences,id,0,&id);
@@ -1051,19 +1048,19 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
         object[id].bounding_box.y=y;
       if (y >= (ssize_t) object[id].bounding_box.height)
         object[id].bounding_box.height=(size_t) y;
-      object[id].color.red+=QuantumScale*GetPixelRed(image,p);
-      object[id].color.green+=QuantumScale*GetPixelGreen(image,p);
-      object[id].color.blue+=QuantumScale*GetPixelBlue(image,p);
+      object[id].color.red+=QuantumScale*(double) GetPixelRed(image,p);
+      object[id].color.green+=QuantumScale*(double) GetPixelGreen(image,p);
+      object[id].color.blue+=QuantumScale*(double) GetPixelBlue(image,p);
       if (image->alpha_trait != UndefinedPixelTrait)
-        object[id].color.alpha+=QuantumScale*GetPixelAlpha(image,p);
+        object[id].color.alpha+=QuantumScale*(double) GetPixelAlpha(image,p);
       if (image->colorspace == CMYKColorspace)
-        object[id].color.black+=QuantumScale*GetPixelBlack(image,p);
+        object[id].color.black+=QuantumScale*(double) GetPixelBlack(image,p);
       object[id].centroid.x+=x;
       object[id].centroid.y+=y;
       object[id].area++;
       SetPixelIndex(component_image,(Quantum) id,q);
-      p+=GetPixelChannels(image);
-      q+=GetPixelChannels(component_image);
+      p+=(ptrdiff_t) GetPixelChannels(image);
+      q+=(ptrdiff_t) GetPixelChannels(component_image);
     }
     if (n > (ssize_t) MaxColormapSize)
       break;
@@ -1096,8 +1093,10 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
   component_image->colors=(size_t) n;
   for (i=0; i < (ssize_t) component_image->colors; i++)
   {
-    object[i].bounding_box.width-=(object[i].bounding_box.x-1);
-    object[i].bounding_box.height-=(object[i].bounding_box.y-1);
+    object[i].bounding_box.width=(size_t) ((ssize_t)
+      object[i].bounding_box.width-(object[i].bounding_box.x-1));
+    object[i].bounding_box.height=(size_t) ((ssize_t)
+      object[i].bounding_box.height-(object[i].bounding_box.y-1));
     object[i].color.red/=(QuantumScale*object[i].area);
     object[i].color.green/=(QuantumScale*object[i].area);
     object[i].color.blue/=(QuantumScale*object[i].area);
@@ -1292,7 +1291,7 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
       */
       (void) sscanf(artifact,"%lf%*[ -]%lf",&min_threshold,&max_threshold);
       metrics[++n]="perimeter";
-      PerimeterThreshold(image,object,n,exception);
+      PerimeterThreshold(component_image,object,n,exception);
       for (i=0; i < (ssize_t) component_image->colors; i++)
         if (((object[i].metric[n] < min_threshold) ||
              (object[i].metric[n] >= max_threshold)) && (i != background_id))
@@ -1306,10 +1305,10 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
       */
       (void) sscanf(artifact,"%lf%*[ -]%lf",&min_threshold,&max_threshold);
       metrics[++n]="circularity";
-      CircularityThreshold(image,object,n,exception);
+      CircularityThreshold(component_image,object,n,exception);
       for (i=0; i < (ssize_t) component_image->colors; i++)
         if (((object[i].metric[n] < min_threshold) ||
-              (object[i].metric[n] >= max_threshold)) && (i != background_id))
+             (object[i].metric[n] >= max_threshold)) && (i != background_id))
           object[i].merge=MagickTrue;
     }
   artifact=GetImageArtifact(image,"connected-components:diameter-threshold");
@@ -1324,7 +1323,7 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
       {
         object[i].metric[n]=ceil(sqrt(4.0*object[i].area/MagickPI)-0.5);
         if (((object[i].metric[n] < min_threshold) ||
-             (object[i].metric[n] >= max_threshold)) && (i != background_id))
+            (object[i].metric[n] >= max_threshold)) && (i != background_id))
           object[i].merge=MagickTrue;
       }
     }
@@ -1339,7 +1338,7 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
       MajorAxisThreshold(component_image,object,n,exception);
       for (i=0; i < (ssize_t) component_image->colors; i++)
         if (((object[i].metric[n] < min_threshold) ||
-              (object[i].metric[n] >= max_threshold)) && (i != background_id))
+             (object[i].metric[n] >= max_threshold)) && (i != background_id))
           object[i].merge=MagickTrue;
     }
   artifact=GetImageArtifact(image,"connected-components:minor-axis-threshold");
@@ -1353,7 +1352,7 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
       MinorAxisThreshold(component_image,object,n,exception);
       for (i=0; i < (ssize_t) component_image->colors; i++)
         if (((object[i].metric[n] < min_threshold) ||
-              (object[i].metric[n] >= max_threshold)) && (i != background_id))
+             (object[i].metric[n] >= max_threshold)) && (i != background_id))
           object[i].merge=MagickTrue;
     }
   artifact=GetImageArtifact(image,"connected-components:eccentricity-threshold");
@@ -1363,7 +1362,7 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
         Merge any object not within the min and max eccentricity threshold.
       */
       (void) sscanf(artifact,"%lf%*[ -]%lf",&min_threshold,&max_threshold);
-      metrics[++n]="eccentricy";
+      metrics[++n]="eccentricity";
       EccentricityThreshold(component_image,object,n,exception);
       for (i=0; i < (ssize_t) component_image->colors; i++)
         if (((object[i].metric[n] < min_threshold) ||
@@ -1460,7 +1459,7 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
             if (j != i)
               object[j].census++;
           }
-        p+=GetPixelChannels(component_image);
+        p+=(ptrdiff_t) GetPixelChannels(component_image);
       }
     }
     /*
@@ -1492,7 +1491,7 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
       {
         if ((ssize_t) GetPixelIndex(component_image,q) == i)
           SetPixelIndex(component_image,(Quantum) id,q);
-        q+=GetPixelChannels(component_image);
+        q+=(ptrdiff_t) GetPixelChannels(component_image);
       }
       if (SyncCacheViewAuthenticPixels(component_view,exception) == MagickFalse)
         status=MagickFalse;
@@ -1567,13 +1566,15 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
           object[id].centroid.x+=x;
           object[id].centroid.y+=y;
           object[id].area++;
-          p+=GetPixelChannels(component_image);
+          p+=(ptrdiff_t) GetPixelChannels(component_image);
         }
       }
       for (i=0; i < (ssize_t) component_image->colors; i++)
       {
-        object[i].bounding_box.width-=(object[i].bounding_box.x-1);
-        object[i].bounding_box.height-=(object[i].bounding_box.y-1);
+        object[i].bounding_box.width=(size_t) ((ssize_t)
+          object[i].bounding_box.width-(object[i].bounding_box.x-1));
+        object[i].bounding_box.height=(size_t) ((ssize_t)
+          object[i].bounding_box.height-(object[i].bounding_box.y-1));
         object[i].centroid.x=object[i].centroid.x/object[i].area;
         object[i].centroid.y=object[i].centroid.y/object[i].area;
       }
@@ -1765,15 +1766,15 @@ MagickExport Image *IntegralImage(const Image *image,ExceptionInfo *exception)
           continue;
         sum=(double) q[i];
         if (x > 0)
-          sum+=(q-GetPixelChannels(integral_image))[i];
+          sum+=(double) (q-GetPixelChannels(integral_image))[i];
         if (y > 0)
-          sum+=p[i];
+          sum+=(double) p[i];
         if ((x > 0) && (y > 0))
-          sum-=(p-GetPixelChannels(integral_image))[i];
+          sum-=(double) (p-GetPixelChannels(integral_image))[i];
         q[i]=ClampToQuantum(sum);
       }
-      p+=GetPixelChannels(integral_image);
-      q+=GetPixelChannels(integral_image);
+      p+=(ptrdiff_t) GetPixelChannels(integral_image);
+      q+=(ptrdiff_t) GetPixelChannels(integral_image);
     }
     sync=SyncCacheViewAuthenticPixels(integral_view,exception);
     if (sync == MagickFalse)

@@ -102,6 +102,7 @@ extern "C" {
 #define _CRTDBG_MAP_ALLOC
 #endif
 #if defined(MAGICKCORE_WINDOWS_SUPPORT)
+# define NOMINMAX
 # include <io.h>
 #if !defined(__CYGWIN__)
 # include <direct.h>
@@ -128,14 +129,15 @@ extern "C" {
 # include <pthread.h>
 #endif
 #if defined(MAGICKCORE_WINDOWS_SUPPORT)
-#if !defined(__CYGWIN__)
-#include <winsock2.h>
-#include <ws2tcpip.h>
-#endif
-#include <windows.h>
-#ifdef _MSC_VER
-#pragma comment (lib, "ws2_32.lib")
-#endif
+#  if !defined(__CYGWIN__)
+#    if defined(MAGICKCORE_DPC_SUPPORT)
+#      include <winsock2.h>
+#      ifdef _MSC_VER
+#        pragma comment (lib, "ws2_32.lib")
+#      endif
+#    endif
+#    include <ws2tcpip.h>
+#  endif
 #endif
 #if defined(MAGICKCORE_HAVE_SYS_SYSLIMITS_H)
 # include <sys/syslimits.h>
@@ -145,11 +147,9 @@ extern "C" {
 #endif
 
 #if defined(MAGICKCORE_HAVE_CL_CL_H)
-#  include <CL/cl.h>
 #  define MAGICKCORE_OPENCL_SUPPORT  1
 #endif
 #if defined(MAGICKCORE_HAVE_OPENCL_CL_H)
-#  include <OpenCL/cl.h>
 #  define MAGICKCORE_OPENCL_SUPPORT  1
 #endif
 
@@ -276,7 +276,7 @@ extern int vsnprintf(char *,size_t,const char *,va_list);
 #  define Exit  exit
 #  define IsBasenameSeparator(c) \
   (((c) == ']') || ((c) == ':') || ((c) == '/') ? MagickTrue : MagickFalse)
-#  define MAGICKCORE_LIBRARY_PATH  "sys$login:"
+#  define MAGICKCORE_LIBRARY_ABSOLUTE_PATH  "sys$login:"
 #  define MAGICKCORE_SHARE_PATH  "sys$login:"
 #  define X11_PREFERENCES_PATH  "decw$user_defaults:"
 #  define ProcessPendingEvents(text)
@@ -341,8 +341,6 @@ extern int vsnprintf(char *,size_t,const char *,va_list);
   Magick defines.
 */
 #define MagickMaxRecursionDepth  600
-#define MAGICK_SSIZE_MAX  (SSIZE_MAX)
-#define MAGICK_SSIZE_MIN  (-(SSIZE_MAX)-1)
 #define Swap(x,y) ((x)^=(y), (y)^=(x), (x)^=(y))
 #if defined(_MSC_VER)
 # define DisableMSCWarning(nr) __pragma(warning(push)) \

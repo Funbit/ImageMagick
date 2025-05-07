@@ -1,5 +1,5 @@
 /*
-  Copyright @ 2003 ImageMagick Studio LLC, a non-profit organization
+  Copyright @ 1999 ImageMagick Studio LLC, a non-profit organization
   dedicated to making software imaging solutions freely available.
 
   You may not use this file except in compliance with the License.  You may
@@ -41,9 +41,9 @@ static inline double SiPrefixToDoubleInterval(const char *string,
 }
 
 static inline double StringToDouble(const char *magick_restrict string,
-  char *magick_restrict *sentinal)
+  char *magick_restrict *sentinel)
 {
-  return(InterpretLocaleValue(string,sentinal));
+  return(InterpretLocaleValue(string,sentinel));
 }
 
 static inline const char *StringLocateSubstring(const char *haystack,
@@ -112,6 +112,18 @@ static inline long StringToLong(const char *magick_restrict value)
   if (value == (const char *) NULL)
     return(0);
   return(strtol(value,(char **) NULL,10));
+}
+
+static inline MagickOffsetType StringToMagickOffsetType(const char *string,
+  const double interval)
+{
+  double
+    value;
+
+  value=SiPrefixToDoubleInterval(string,interval);
+  if (value >= (double) MagickULLConstant(~0))
+    return((MagickOffsetType) MagickULLConstant(~0));
+  return((MagickOffsetType) value);
 }
 
 static inline MagickSizeType StringToMagickSizeType(const char *string,

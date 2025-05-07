@@ -122,19 +122,12 @@ static Image *ReadJBIGImage(const ImageInfo *image_info,
     status;
 
   Quantum
-    index;
-
-  ssize_t
-    x;
-
-  Quantum
+    index,
     *q;
-
-  unsigned char
-    *p;
 
   ssize_t
     length,
+    x,
     y;
 
   struct jbg_dec_state
@@ -143,7 +136,8 @@ static Image *ReadJBIGImage(const ImageInfo *image_info,
   unsigned char
     bit,
     *buffer,
-    byte;
+    byte,
+    *p;
 
   /*
     Open image file.
@@ -165,6 +159,9 @@ static Image *ReadJBIGImage(const ImageInfo *image_info,
   /*
     Initialize JBIG toolkit.
   */
+  if ((image->columns != (unsigned long) image->columns) ||
+      (image->rows != (unsigned long) image->rows))
+    ThrowReaderException(ImageError,"WidthOrHeightExceedsLimit");
   jbg_dec_init(&jbig_info);
   jbg_dec_maxsize(&jbig_info,(unsigned long) image->columns,(unsigned long)
     image->rows);
@@ -195,8 +192,8 @@ static Image *ReadJBIGImage(const ImageInfo *image_info,
       size_t
         count;
 
-      status=jbg_dec_in(&jbig_info,p,length,&count);
-      p+=count;
+      status=(MagickStatusType) jbg_dec_in(&jbig_info,p,(size_t) length,&count);
+      p+=(ptrdiff_t) count;
       length-=(ssize_t) count;
     }
   } while ((status == JBG_EAGAIN) || (status == JBG_EOK));
@@ -256,7 +253,7 @@ static Image *ReadJBIGImage(const ImageInfo *image_info,
         bit=0;
       SetPixelIndex(image,index,q);
       SetPixelViaPixelInfo(image,image->colormap+(ssize_t) index,q);
-      q+=GetPixelChannels(image);
+      q+=(ptrdiff_t) GetPixelChannels(image);
     }
     if (SyncAuthenticPixels(image,exception) == MagickFalse)
       break;
@@ -270,7 +267,10 @@ static Image *ReadJBIGImage(const ImageInfo *image_info,
   */
   jbg_dec_free(&jbig_info);
   buffer=(unsigned char *) RelinquishMagickMemory(buffer);
-  (void) CloseBlob(image);
+  if (CloseBlob(image) == MagickFalse)
+    status=MagickFalse;
+  if (status == MagickFalse)
+    return(DestroyImageList(image));
   return(GetFirstImageInList(image));
 }
 #endif
@@ -407,6 +407,9 @@ static void JBIGEncode(unsigned char *pixels,size_t length,void *data)
 static MagickBooleanType WriteJBIGImage(const ImageInfo *image_info,
   Image *image,ExceptionInfo *exception)
 {
+  const Quantum
+    *p;
+
   double
     version;
 
@@ -419,20 +422,12 @@ static MagickBooleanType WriteJBIGImage(const ImageInfo *image_info,
   MemoryInfo
     *pixel_info;
 
-  const Quantum
-    *p;
-
-  ssize_t
-    x;
-
-  unsigned char
-    *q;
-
   size_t
     number_images,
     number_packets;
 
   ssize_t
+    x,
     y;
 
   struct jbg_enc_state
@@ -441,7 +436,8 @@ static MagickBooleanType WriteJBIGImage(const ImageInfo *image_info,
   unsigned char
     bit,
     byte,
-    *pixels;
+    *pixels,
+    *q;
 
   /*
     Open image file.
@@ -487,7 +483,7 @@ static MagickBooleanType WriteJBIGImage(const ImageInfo *image_info,
       for (x=0; x < (ssize_t) image->columns; x++)
       {
         byte<<=1;
-        if (GetPixelLuma(image,p) < (QuantumRange/2.0))
+        if (GetPixelLuma(image,p) < ((double) QuantumRange/2.0))
           byte|=0x01;
         bit++;
         if (bit == 8)
@@ -496,7 +492,7 @@ static MagickBooleanType WriteJBIGImage(const ImageInfo *image_info,
             bit=0;
             byte=0;
           }
-        p+=GetPixelChannels(image);
+        p+=(ptrdiff_t) GetPixelChannels(image);
       }
       if (bit != 0)
         *q++=byte << (8-bit);
@@ -548,7 +544,7 @@ static MagickBooleanType WriteJBIGImage(const ImageInfo *image_info,
       }
     (void) jbg_enc_lrange(&jbig_info,-1,-1);
     jbg_enc_options(&jbig_info,JBG_ILEAVE | JBG_SMID,JBG_TPDON | JBG_TPBON |
-      JBG_DPON,version < 1.6 ? -1 : 0,-1,-1);
+      JBG_DPON,version < 1.6 ? ~0UL : 0UL,-1,-1);
     /*
       Write JBIG image.
     */
@@ -562,7 +558,8 @@ static MagickBooleanType WriteJBIGImage(const ImageInfo *image_info,
     if (status == MagickFalse)
       break;
   } while (image_info->adjoin != MagickFalse);
-  (void) CloseBlob(image);
-  return(MagickTrue);
+  if (CloseBlob(image) == MagickFalse)
+    status=MagickFalse;
+  return(status);
 }
 #endif

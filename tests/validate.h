@@ -1,5 +1,5 @@
 /*
-  Copyright 1999-2021 ImageMagick Studio LLC, a non-profit organization
+  Copyright 1999 ImageMagick Studio LLC, a non-profit organization
   dedicated to making software imaging solutions freely available.
 
   You may not use this file except in compliance with the License.  You may
@@ -98,13 +98,16 @@ static const char
   *convert_options[] =
   {
     "",
+    "-affine 1,0,0.785,1,0,0 -transform",
+    "-alpha set",
     "-black-threshold 20%",
     "-blur 0x0.5",
     "-blur 0x1.0",
     "-blur 0x2.0",
-    "-border 6x6",
+    "-bordercolor red -border 6x6",
     "-canny 0x1+10%+80%",
     "-channel red",
+    "-colorspace CMYK -channel Cyan",
     "-charcoal 0x1",
     "-chop 80x60+10+20",
     "-chop 8x6+20+30",
@@ -128,6 +131,9 @@ static const char
     "-crop 60x70+10+10",
     "-cycle 200",
     "-density 75x75 -resample 50x50",
+    "-depth 7",
+    "-depth 16",
+    "-depth 32",
     "-despeckle",
     "-draw \"affine 1,0,0.785,1,0,0\"",
     "-draw \"rectangle 20,10 80,50\"",

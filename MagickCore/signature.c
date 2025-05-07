@@ -84,7 +84,7 @@ struct _SignatureInfo
   MagickBooleanType
     lsb_first;
 
-  ssize_t
+  time_t
     timestamp;
 
   size_t
@@ -139,7 +139,7 @@ MagickPrivate SignatureInfo *AcquireSignatureInfo(void)
   lsb_first=1;
   signature_info->lsb_first=(int) (*(char *) &lsb_first) == 1 ? MagickTrue :
     MagickFalse;
-  signature_info->timestamp=(ssize_t) GetMagickTime();
+  signature_info->timestamp=GetMagickTime();
   signature_info->signature=MagickCoreSignature;
   InitializeSignature(signature_info);
   return(signature_info);
@@ -533,7 +533,7 @@ MagickExport MagickBooleanType SignatureImage(Image *image,
 
       if (GetPixelReadMask(image,p) <= (QuantumRange/2))
         {
-          p+=GetPixelChannels(image);
+          p+=(ptrdiff_t) GetPixelChannels(image);
           continue;
         }
       for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
@@ -545,7 +545,7 @@ MagickExport MagickBooleanType SignatureImage(Image *image,
         PixelTrait traits = GetPixelChannelTraits(image,channel);
         if ((traits & UpdatePixelTrait) == 0)
           continue;
-        pixel=(float) (QuantumScale*p[i]);
+        pixel=(float) (QuantumScale*(double) p[i]);
         if (signature_info->lsb_first == MagickFalse)
           for (j=(ssize_t) sizeof(pixel)-1; j >= 0; j--)
             *q++=(unsigned char) ((unsigned char *) &pixel)[j];
@@ -553,7 +553,7 @@ MagickExport MagickBooleanType SignatureImage(Image *image,
           for (j=0; j < (ssize_t) sizeof(pixel); j++)
             *q++=(unsigned char) ((unsigned char *) &pixel)[j];
       }
-      p+=GetPixelChannels(image);
+      p+=(ptrdiff_t) GetPixelChannels(image);
     }
     SetStringInfoLength(signature,(size_t) (q-pixels));
     UpdateSignature(signature_info,signature);
@@ -633,7 +633,7 @@ static void TransformSignature(SignatureInfo *signature_info)
     };  /* 32-bit fractional part of the cube root of the first 64 primes */
 
   unsigned int
-    A,
+    A = 0,
     B,
     C,
     D,
@@ -657,14 +657,14 @@ RestoreMSCWarning
         for (i=0; i < 16; i++)
         {
           T=(*((unsigned int *) p));
-          p+=4;
+          p+=(ptrdiff_t) 4;
           W[i]=Trunc32(T);
         }
       else
         for (i=0; i < 16; i+=2)
         {
           T=(*((unsigned int *) p));
-          p+=8;
+          p+=(ptrdiff_t) 8;
           W[i]=Trunc32(T >> shift);
           W[i+1]=Trunc32(T);
         }
@@ -676,7 +676,7 @@ RestoreMSCWarning
       for (i=0; i < 16; i++)
       {
         T=(*((unsigned int *) p));
-        p+=4;
+        p+=(ptrdiff_t) 4;
         W[i]=((T << 24) & 0xff000000) | ((T << 8) & 0x00ff0000) |
           ((T >> 8) & 0x0000ff00) | ((T >> 24) & 0x000000ff);
       }
@@ -684,7 +684,7 @@ RestoreMSCWarning
       for (i=0; i < 16; i+=2)
       {
         T=(*((unsigned int *) p));
-        p+=8;
+        p+=(ptrdiff_t) 8;
         W[i]=((T << 24) & 0xff000000) | ((T << 8) & 0x00ff0000) |
           ((T >> 8) & 0x0000ff00) | ((T >> 24) & 0x000000ff);
         T>>=shift;
@@ -804,7 +804,7 @@ MagickPrivate void UpdateSignature(SignatureInfo *signature_info,
       (void) memcpy(GetStringInfoDatum(signature_info->message)+
         signature_info->extent,p,i);
       n-=i;
-      p+=i;
+      p+=(ptrdiff_t) i;
       signature_info->extent+=i;
       if (signature_info->extent != GetStringInfoLength(signature_info->message))
         return;
@@ -813,7 +813,7 @@ MagickPrivate void UpdateSignature(SignatureInfo *signature_info,
   while (n >= GetStringInfoLength(signature_info->message))
   {
     SetStringInfoDatum(signature_info->message,p);
-    p+=GetStringInfoLength(signature_info->message);
+    p+=(ptrdiff_t) GetStringInfoLength(signature_info->message);
     n-=GetStringInfoLength(signature_info->message);
     TransformSignature(signature_info);
   }

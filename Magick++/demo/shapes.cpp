@@ -11,6 +11,7 @@
 //
 
 #include <Magick++.h>
+#include <cstdlib>
 #include <string>
 #include <iostream>
 
@@ -22,7 +23,7 @@ int main( int /*argc*/, char ** argv)
 {
 
   // Initialize ImageMagick install location for Windows
-  InitializeMagick(*argv);
+  MagickPlusPlusGenesis genesis(*argv);
 
   try {
 
@@ -90,19 +91,19 @@ int main( int /*argc*/, char ** argv)
     if (getenv("MAGICK_FONT") != 0)
       image.font(string(getenv("MAGICK_FONT")));
     image.fontPointsize( 18 );
-#if MAGICKCORE_FREETYPE_DELEGATE
+#if defined(MAGICKCORE_FREETYPE_DELEGATE)
     image.annotate( "Hello world!", "+150+20" );
 #endif
 
     image.fillColor( "blue" );
     image.fontPointsize( 14 );
-#if MAGICKCORE_FREETYPE_DELEGATE
+#if defined(MAGICKCORE_FREETYPE_DELEGATE)
     image.annotate( "Goodbye cruel world!", "+150+38" );
 #endif
 
     image.fillColor( "black" );
     image.fontPointsize( 14 );
-#if MAGICKCORE_FREETYPE_DELEGATE
+#if defined(MAGICKCORE_FREETYPE_DELEGATE)
     image.annotate( "I'm climbing the wall!", "+280+120",
                     NorthWestGravity, 90.0 );
 #endif

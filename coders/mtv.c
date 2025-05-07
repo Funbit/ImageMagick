@@ -187,7 +187,7 @@ static Image *ReadMTVImage(const ImageInfo *image_info,ExceptionInfo *exception)
         SetPixelGreen(image,ScaleCharToQuantum(*p++),q);
         SetPixelBlue(image,ScaleCharToQuantum(*p++),q);
         SetPixelAlpha(image,OpaqueAlpha,q);
-        q+=GetPixelChannels(image);
+        q+=(ptrdiff_t) GetPixelChannels(image);
       }
       if (SyncAuthenticPixels(image,exception) == MagickFalse)
         break;
@@ -234,7 +234,8 @@ static Image *ReadMTVImage(const ImageInfo *image_info,ExceptionInfo *exception)
           break;
       }
   } while (count > 0);
-  (void) CloseBlob(image);
+  if (CloseBlob(image) == MagickFalse)
+    status=MagickFalse;
   if (status == MagickFalse)
     return(DestroyImageList(image));
   return(GetFirstImageInList(image));
@@ -333,29 +334,25 @@ static MagickBooleanType WriteMTVImage(const ImageInfo *image_info,Image *image,
   char
     buffer[MagickPathExtent];
 
+  const Quantum
+    *p;
+
   MagickBooleanType
     status;
 
   MagickOffsetType
     scene;
 
-  const Quantum
-    *p;
-
-  ssize_t
-    x;
-
-  unsigned char
-    *q;
-
   size_t
-    imageListLength;
+    number_scenes;
 
   ssize_t
+    x,
     y;
 
   unsigned char
-    *pixels;
+    *pixels,
+    *q;
 
   /*
     Open output image file.
@@ -372,7 +369,7 @@ static MagickBooleanType WriteMTVImage(const ImageInfo *image_info,Image *image,
   if (status == MagickFalse)
     return(status);
   scene=0;
-  imageListLength=GetImageListLength(image);
+  number_scenes=GetImageListLength(image);
   do
   {
     /*
@@ -401,7 +398,7 @@ static MagickBooleanType WriteMTVImage(const ImageInfo *image_info,Image *image,
         *q++=ScaleQuantumToChar(GetPixelRed(image,p));
         *q++=ScaleQuantumToChar(GetPixelGreen(image,p));
         *q++=ScaleQuantumToChar(GetPixelBlue(image,p));
-        p+=GetPixelChannels(image);
+        p+=(ptrdiff_t) GetPixelChannels(image);
       }
       (void) WriteBlob(image,(size_t) (q-pixels),pixels);
       if (image->previous == (Image *) NULL)
@@ -416,11 +413,12 @@ static MagickBooleanType WriteMTVImage(const ImageInfo *image_info,Image *image,
     if (GetNextImageInList(image) == (Image *) NULL)
       break;
     image=SyncNextImageInList(image);
-    status=SetImageProgress(image,SaveImagesTag,scene,imageListLength);
+    status=SetImageProgress(image,SaveImagesTag,scene,number_scenes);
     if (status == MagickFalse)
       break;
     scene++;
   } while (image_info->adjoin != MagickFalse);
-  (void) CloseBlob(image);
-  return(MagickTrue);
+  if (CloseBlob(image) == MagickFalse)
+    status=MagickFalse;
+  return(status);
 }

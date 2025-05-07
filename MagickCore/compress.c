@@ -233,13 +233,11 @@ static inline void Ascii85Tuple(Ascii85Info *ascii85_info,
 {
 #define MaxLineExtent  36L
 
-  ssize_t
-    i,
-    x;
-
   size_t
     code,
-    quantum;
+    i,
+    quantum,
+    x;
 
   code=((((size_t) data[0] << 8) | (size_t) data[1]) << 16) |
     ((size_t) data[2] << 8) | (size_t) data[3];
@@ -252,7 +250,7 @@ static inline void Ascii85Tuple(Ascii85Info *ascii85_info,
   quantum=85UL*85UL*85UL*85UL;
   for (i=0; i < 4; i++)
   {
-    x=(ssize_t) (code/quantum);
+    x=(code/quantum);
     code-=quantum*x;
     ascii85_info->tuple[i]=(char) (x+(int) '!');
     quantum/=85L;
@@ -329,10 +327,10 @@ MagickExport void Ascii85Encode(Image *image,const unsigned char code)
         }
       (void) WriteBlobByte(image,(unsigned char) *q);
     }
-    p+=8;
+    p+=(ptrdiff_t) 8;
   }
   image->ascii85->offset=n;
-  p-=4;
+  p-=(ptrdiff_t)4;
   for (n=0; n < 4; n++)
     image->ascii85->buffer[n]=(*p++);
 }
@@ -408,7 +406,8 @@ MagickExport MagickBooleanType HuffmanDecodeImage(Image *image,
     **mw_hash;
 
   int
-    byte;
+    byte,
+    mask;
 
   MagickBooleanType
     proceed;
@@ -416,25 +415,20 @@ MagickExport MagickBooleanType HuffmanDecodeImage(Image *image,
   Quantum
     index;
 
-  ssize_t
-    i;
-
-  unsigned char
-    *p;
-
   size_t
     bit,
     code,
-    mask,
     length,
     null_lines,
     runlength;
 
   ssize_t
     count,
+    i,
     y;
 
   unsigned char
+    *p,
     *scanline;
 
   unsigned int
@@ -621,7 +615,7 @@ MagickExport MagickBooleanType HuffmanDecodeImage(Image *image,
       index=(Quantum) (*p++);
       SetPixelIndex(image,index,q);
       SetPixelViaPixelInfo(image,image->colormap+(ssize_t) index,q);
-      q+=GetPixelChannels(image);
+      q+=(ptrdiff_t) GetPixelChannels(image);
     }
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
       break;
@@ -794,7 +788,7 @@ RestoreMSCWarning \
     {
       *q++=(unsigned char) (GetPixelIntensity(huffman_image,p) >=
         ((double) QuantumRange/2.0) ? 0 : 1);
-      p+=GetPixelChannels(huffman_image);
+      p+=(ptrdiff_t) GetPixelChannels(huffman_image);
     }
     /*
       Huffman encode scanline.

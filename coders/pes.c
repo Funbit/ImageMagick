@@ -17,7 +17,7 @@
 %                                 July 2009                                   %
 %                                                                             %
 %                                                                             %
-%  Copyright @ 2009 ImageMagick Studio LLC, a non-profit organization         %
+%  Copyright @ 1999 ImageMagick Studio LLC, a non-profit organization         %
 %  dedicated to making software imaging solutions freely available.           %
 %                                                                             %
 %  You may not use this file except in compliance with the License.  You may  %
@@ -493,7 +493,7 @@ static Image *ReadPESImage(const ImageInfo *image_info,ExceptionInfo *exception)
     ThrowReaderException(CorruptImageError,"ImproperImageHeader");
   count=ReadBlob(image,4,version);
   offset=ReadBlobLSBSignedLong(image);
-  if (DiscardBlobBytes(image,offset+36) == MagickFalse)
+  if (DiscardBlobBytes(image,(MagickSizeType) (offset+36)) == MagickFalse)
     ThrowFileException(exception,CorruptImageError,"UnexpectedEndOfFile",
       image->filename);
   if (EOFBlob(image) != MagickFalse)

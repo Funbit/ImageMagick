@@ -142,7 +142,10 @@ static Image* FaxReadG3(Image *image,ExceptionInfo *exception)
   if (EOFBlob(image) != MagickFalse)
     ThrowFileException(exception,CorruptImageError,"UnexpectedEndOfFile",
       image->filename);
-  (void) CloseBlob(image);
+  if (CloseBlob(image) == MagickFalse)
+    status=MagickFalse;
+  if (status == MagickFalse)
+    return(DestroyImageList(image));
   return(GetFirstImageInList(image));
 }
 
@@ -363,7 +366,7 @@ static MagickBooleanType WriteFAXImage(const ImageInfo *image_info,Image *image,
     scene;
 
   size_t
-    imageListLength;
+    number_scenes;
 
   /*
     Open output image file.
@@ -382,7 +385,7 @@ static MagickBooleanType WriteFAXImage(const ImageInfo *image_info,Image *image,
   write_info=CloneImageInfo(image_info);
   (void) CopyMagickString(write_info->magick,"FAX",MagickPathExtent);
   scene=0;
-  imageListLength=GetImageListLength(image);
+  number_scenes=GetImageListLength(image);
   do
   {
     /*
@@ -394,11 +397,12 @@ static MagickBooleanType WriteFAXImage(const ImageInfo *image_info,Image *image,
     if (GetNextImageInList(image) == (Image *) NULL)
       break;
     image=SyncNextImageInList(image);
-    status=SetImageProgress(image,SaveImagesTag,scene++,imageListLength);
+    status=SetImageProgress(image,SaveImagesTag,scene++,number_scenes);
     if (status == MagickFalse)
       break;
   } while (write_info->adjoin != MagickFalse);
   write_info=DestroyImageInfo(write_info);
-  (void) CloseBlob(image);
+  if (CloseBlob(image) == MagickFalse)
+    status=MagickFalse;
   return(status);
 }

@@ -124,40 +124,39 @@ static Image *ReadSCTImage(const ImageInfo *image_info,ExceptionInfo *exception)
   char
     magick[2];
 
-  Image
-    *image;
-
-  MagickBooleanType
-    status;
-
   double
     height,
     width;
 
+  Image
+    *image;
+
   int
     c;
 
-  Quantum
-    pixel;
+  MagickBooleanType
+    status;
 
-  ssize_t
-    i,
-    x;
+  MagickSizeType
+    extent;
 
   Quantum
+    pixel,
     *q;
-
-  ssize_t
-    count,
-    y;
-
-  unsigned char
-    buffer[768];
 
   size_t
     separations,
     separations_mask,
     units;
+
+  ssize_t
+    count,
+    i,
+    x,
+    y;
+
+  unsigned char
+    buffer[768];
 
   /*
     Open image file.
@@ -198,12 +197,12 @@ static Image *ReadSCTImage(const ImageInfo *image_info,ExceptionInfo *exception)
   count=ReadBlob(image,174,buffer);
   count=ReadBlob(image,768,buffer);
   /*
-    Read paramter block.
+    Read parameter block.
   */
-  units=1UL*ReadBlobByte(image);
+  units=(size_t) ReadBlobByte(image);
   if (units == 0)
     image->units=PixelsPerCentimeterResolution;
-  separations=1UL*ReadBlobByte(image);
+  separations=(size_t) ReadBlobByte(image);
   separations_mask=ReadBlobMSBShort(image);
   count=ReadBlob(image,14,buffer);
   buffer[14]='\0';
@@ -222,6 +221,8 @@ static Image *ReadSCTImage(const ImageInfo *image_info,ExceptionInfo *exception)
   if ((image->columns < 1) || (image->rows < 1) ||
       (width < MagickEpsilon) || (height < MagickEpsilon))
     ThrowReaderException(CorruptImageError,"ImproperImageHeader");
+  if (EOFBlob(image) != MagickFalse)
+    ThrowReaderException(CorruptImageError,"UnexpectedEndOfFile");
   image->resolution.x=1.0*image->columns/width;
   image->resolution.y=1.0*image->rows/height;
   if (image_info->ping != MagickFalse)
@@ -232,6 +233,13 @@ static Image *ReadSCTImage(const ImageInfo *image_info,ExceptionInfo *exception)
   status=SetImageExtent(image,image->columns,image->rows,exception);
   if (status == MagickFalse)
     return(DestroyImageList(image));
+  extent=(MagickSizeType) image->rows*image->columns*separations;
+  if (extent > GetBlobSize(image))
+    {
+      ThrowFileException(exception,CorruptImageError,"UnexpectedEndOfFile",
+        image->filename);
+      return(DestroyImageList(image));
+    }
   /*
     Convert SCT raster image to pixel packets.
   */
@@ -278,14 +286,15 @@ static Image *ReadSCTImage(const ImageInfo *image_info,ExceptionInfo *exception)
             break;
           }
         }
-        q+=GetPixelChannels(image);
+        q+=(ptrdiff_t) GetPixelChannels(image);
       }
       if (x < (ssize_t) image->columns)
         break;
       if (SyncAuthenticPixels(image,exception) == MagickFalse)
         break;
       if ((image->columns % 2) != 0)
-        (void) ReadBlobByte(image);  /* pad */
+        if (ReadBlobByte(image) == EOF)  /* pad */
+          break;
     }
     if (i < (ssize_t) separations)
       break;
@@ -297,7 +306,10 @@ static Image *ReadSCTImage(const ImageInfo *image_info,ExceptionInfo *exception)
   if (EOFBlob(image) != MagickFalse)
     ThrowFileException(exception,CorruptImageError,"UnexpectedEndOfFile",
       image->filename);
-  (void) CloseBlob(image);
+  if (CloseBlob(image) == MagickFalse)
+    status=MagickFalse;
+  if (status == MagickFalse)
+    return(DestroyImageList(image));
   return(GetFirstImageInList(image));
 }
 

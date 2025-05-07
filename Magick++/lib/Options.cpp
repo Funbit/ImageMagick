@@ -229,7 +229,7 @@ void Magick::Options::fileName(const std::string &fileName_)
     max_length;
 
   max_length=sizeof(_imageInfo->filename)-1;
-  fileName_.copy(_imageInfo->filename,max_length);
+  fileName_.copy(_imageInfo->filename,(size_t) max_length);
   if ((ssize_t) fileName_.length() > max_length)
     _imageInfo->filename[max_length]=0;
   else
@@ -472,14 +472,18 @@ Magick::ColorspaceType Magick::Options::quantizeColorSpace(void) const
 
 void Magick::Options::quantizeDither(const bool ditherFlag_)
 {
-  _imageInfo->dither=(MagickBooleanType) ditherFlag_;
-  _quantizeInfo->dither_method=ditherFlag_ ? RiemersmaDitherMethod :
-    NoDitherMethod;
+  quantizeDither(ditherFlag_ ? RiemersmaDitherMethod : NoDitherMethod);
 }
 
 bool Magick::Options::quantizeDither(void) const
 {
   return(static_cast<bool>(_imageInfo->dither));
+}
+
+void Magick::Options::quantizeDither(const DitherMethod ditherMethod_)
+{
+  _imageInfo->dither=(MagickBooleanType) (ditherMethod_ != NoDitherMethod);
+  _quantizeInfo->dither_method=ditherMethod_;
 }
 
 void Magick::Options::quantizeDitherMethod(const DitherMethod ditherMethod_)
@@ -596,9 +600,12 @@ void Magick::Options::strokeDashArray(const double *strokeDashArray_)
       if (!_drawInfo->dash_pattern)
         throwExceptionExplicit(MagickCore::ResourceLimitError,
           "Unable to allocate dash-pattern memory");
-      // Copy elements
-      memcpy(_drawInfo->dash_pattern,strokeDashArray_,(x+1)*sizeof(double));
-      _drawInfo->dash_pattern[x]=0.0;
+      else
+        {
+          // Copy elements
+          memcpy(_drawInfo->dash_pattern,strokeDashArray_,(x+1)*sizeof(double));
+          _drawInfo->dash_pattern[x]=0.0;
+        }
     }
 }
 

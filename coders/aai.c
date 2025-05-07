@@ -101,14 +101,8 @@ static Image *ReadAAIImage(const ImageInfo *image_info,ExceptionInfo *exception)
   MagickBooleanType
     status;
 
-  ssize_t
-    x;
-
   Quantum
     *q;
-
-  unsigned char
-    *p;
 
   size_t
     height,
@@ -117,9 +111,11 @@ static Image *ReadAAIImage(const ImageInfo *image_info,ExceptionInfo *exception)
 
   ssize_t
     count,
+    x,
     y;
 
   unsigned char
+    *p,
     *pixels;
 
   /*
@@ -189,7 +185,7 @@ static Image *ReadAAIImage(const ImageInfo *image_info,ExceptionInfo *exception)
         SetPixelAlpha(image,ScaleCharToQuantum(*p++),q);
         if (GetPixelAlpha(image,q) != OpaqueAlpha)
           image->alpha_trait=BlendPixelTrait;
-        q+=GetPixelChannels(image);
+        q+=(ptrdiff_t) GetPixelChannels(image);
       }
       if (SyncAuthenticPixels(image,exception) == MagickFalse)
         break;
@@ -234,7 +230,8 @@ static Image *ReadAAIImage(const ImageInfo *image_info,ExceptionInfo *exception)
           break;
       }
   } while ((width != 0UL) && (height != 0UL));
-  (void) CloseBlob(image);
+  if (CloseBlob(image) == MagickFalse)
+    status=MagickFalse;
   if (status == MagickFalse)
     return(DestroyImageList(image));
   return(GetFirstImageInList(image));
@@ -328,30 +325,26 @@ ModuleExport void UnregisterAAIImage(void)
 static MagickBooleanType WriteAAIImage(const ImageInfo *image_info,Image *image,
   ExceptionInfo *exception)
 {
+  const Quantum
+    *magick_restrict p;
+
   MagickBooleanType
     status;
 
   MagickOffsetType
     scene;
 
-  const Quantum
-    *magick_restrict p;
-
-  ssize_t
-    x;
-
-  unsigned char
-    *magick_restrict q;
-
   size_t
-    imageListLength;
+    number_scenes;
 
   ssize_t
     count,
+    x,
     y;
 
   unsigned char
-    *pixels;
+    *pixels,
+    *magick_restrict q;
 
   /*
     Open output image file.
@@ -368,7 +361,7 @@ static MagickBooleanType WriteAAIImage(const ImageInfo *image_info,Image *image,
   if (status == MagickFalse)
     return(status);
   scene=0;
-  imageListLength=GetImageListLength(image);
+  number_scenes=GetImageListLength(image);
   do
   {
     /*
@@ -403,7 +396,7 @@ static MagickBooleanType WriteAAIImage(const ImageInfo *image_info,Image *image,
           UndefinedPixelTrait ? GetPixelAlpha(image,p) : OpaqueAlpha));
         if (*q == 255)
           *q=254;
-        p+=GetPixelChannels(image);
+        p+=(ptrdiff_t) GetPixelChannels(image);
         q++;
       }
       count=WriteBlob(image,(size_t) (q-pixels),pixels);
@@ -421,10 +414,11 @@ static MagickBooleanType WriteAAIImage(const ImageInfo *image_info,Image *image,
     if (GetNextImageInList(image) == (Image *) NULL)
       break;
     image=SyncNextImageInList(image);
-    status=SetImageProgress(image,SaveImagesTag,scene++,imageListLength);
+    status=SetImageProgress(image,SaveImagesTag,scene++,number_scenes);
     if (status == MagickFalse)
       break;
   } while (image_info->adjoin != MagickFalse);
-  (void) CloseBlob(image);
-  return(MagickTrue);
+  if (CloseBlob(image) == MagickFalse)
+    status=MagickFalse;
+  return(status);
 }

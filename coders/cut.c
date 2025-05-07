@@ -16,7 +16,7 @@
 %                                 June 2000                                   %
 %                                                                             %
 %                                                                             %
-%  Copyright @ 2000 ImageMagick Studio LLC, a non-profit organization         %
+%  Copyright @ 1999 ImageMagick Studio LLC, a non-profit organization         %
 %  dedicated to making software imaging solutions freely available.           %
 %                                                                             %
 %  You may not use this file except in compliance with the License.  You may  %
@@ -118,7 +118,7 @@ static MagickBooleanType InsertRow(Image *image,ssize_t bpp,unsigned char *p,
             SetPixelIndex(image,index,q);
             if (index < image->colors)
               SetPixelViaPixelInfo(image,image->colormap+(ssize_t) index,q);
-            q+=GetPixelChannels(image);
+            q+=(ptrdiff_t) GetPixelChannels(image);
           }
           p++;
         }
@@ -131,7 +131,7 @@ static MagickBooleanType InsertRow(Image *image,ssize_t bpp,unsigned char *p,
               if (index < image->colors)
                 SetPixelViaPixelInfo(image,image->colormap+(ssize_t) index,q);
               SetPixelViaPixelInfo(image,image->colormap+(ssize_t) index,q);
-              q+=GetPixelChannels(image);
+              q+=(ptrdiff_t) GetPixelChannels(image);
             }
             p++;
           }
@@ -145,22 +145,22 @@ static MagickBooleanType InsertRow(Image *image,ssize_t bpp,unsigned char *p,
             SetPixelIndex(image,index,q);
             if (index < image->colors)
               SetPixelViaPixelInfo(image,image->colormap+(ssize_t) index,q);
-            q+=GetPixelChannels(image);
+            q+=(ptrdiff_t) GetPixelChannels(image);
             index=ConstrainColormapIndex(image,(*p >> 4) & 0x3,exception);
             SetPixelIndex(image,index,q);
             if (index < image->colors)
               SetPixelViaPixelInfo(image,image->colormap+(ssize_t) index,q);
-            q+=GetPixelChannels(image);
+            q+=(ptrdiff_t) GetPixelChannels(image);
             index=ConstrainColormapIndex(image,(*p >> 2) & 0x3,exception);
             SetPixelIndex(image,index,q);
             if (index < image->colors)
               SetPixelViaPixelInfo(image,image->colormap+(ssize_t) index,q);
-            q+=GetPixelChannels(image);
+            q+=(ptrdiff_t) GetPixelChannels(image);
             index=ConstrainColormapIndex(image,(*p) & 0x3,exception);
             SetPixelIndex(image,index,q);
             if (index < image->colors)
               SetPixelViaPixelInfo(image,image->colormap+(ssize_t) index,q);
-            q+=GetPixelChannels(image);
+            q+=(ptrdiff_t) GetPixelChannels(image);
             p++;
         }
        if ((image->columns % 4) != 0)
@@ -169,14 +169,14 @@ static MagickBooleanType InsertRow(Image *image,ssize_t bpp,unsigned char *p,
             SetPixelIndex(image,index,q);
             if (index < image->colors)
               SetPixelViaPixelInfo(image,image->colormap+(ssize_t) index,q);
-            q+=GetPixelChannels(image);
+            q+=(ptrdiff_t) GetPixelChannels(image);
             if ((image->columns % 4) > 1)
               {
                 index=ConstrainColormapIndex(image,(*p >> 4) & 0x3,exception);
                 SetPixelIndex(image,index,q);
                 if (index < image->colors)
                   SetPixelViaPixelInfo(image,image->colormap+(ssize_t) index,q);
-                q+=GetPixelChannels(image);
+                q+=(ptrdiff_t) GetPixelChannels(image);
                 if ((image->columns % 4) > 2)
                   {
                     index=ConstrainColormapIndex(image,(*p >> 2) & 0x3,
@@ -185,7 +185,7 @@ static MagickBooleanType InsertRow(Image *image,ssize_t bpp,unsigned char *p,
                     if (index < image->colors)
                       SetPixelViaPixelInfo(image,image->colormap+(ssize_t)
                         index,q);
-                    q+=GetPixelChannels(image);
+                    q+=(ptrdiff_t) GetPixelChannels(image);
                   }
               }
             p++;
@@ -201,13 +201,13 @@ static MagickBooleanType InsertRow(Image *image,ssize_t bpp,unsigned char *p,
             SetPixelIndex(image,index,q);
             if (index < image->colors)
               SetPixelViaPixelInfo(image,image->colormap+(ssize_t) index,q);
-            q+=GetPixelChannels(image);
+            q+=(ptrdiff_t) GetPixelChannels(image);
             index=ConstrainColormapIndex(image,(*p) & 0x0f,exception);
             SetPixelIndex(image,index,q);
             if (index < image->colors)
               SetPixelViaPixelInfo(image,image->colormap+(ssize_t) index,q);
             p++;
-            q+=GetPixelChannels(image);
+            q+=(ptrdiff_t) GetPixelChannels(image);
           }
         if ((image->columns % 2) != 0)
           {
@@ -216,7 +216,7 @@ static MagickBooleanType InsertRow(Image *image,ssize_t bpp,unsigned char *p,
             if (index < image->colors)
               SetPixelViaPixelInfo(image,image->colormap+(ssize_t) index,q);
             p++;
-            q+=GetPixelChannels(image);
+            q+=(ptrdiff_t) GetPixelChannels(image);
           }
         break;
       }
@@ -229,7 +229,7 @@ static MagickBooleanType InsertRow(Image *image,ssize_t bpp,unsigned char *p,
             if (index < image->colors)
               SetPixelViaPixelInfo(image,image->colormap+(ssize_t) index,q);
             p++;
-            q+=GetPixelChannels(image);
+            q+=(ptrdiff_t) GetPixelChannels(image);
           }
       }
       break;
@@ -240,7 +240,7 @@ static MagickBooleanType InsertRow(Image *image,ssize_t bpp,unsigned char *p,
           SetPixelRed(image,ScaleCharToQuantum(*p++),q);
           SetPixelGreen(image,ScaleCharToQuantum(*p++),q);
           SetPixelBlue(image,ScaleCharToQuantum(*p++),q);
-          q+=GetPixelChannels(image);
+          q+=(ptrdiff_t) GetPixelChannels(image);
         }
       break;
     }
@@ -278,7 +278,7 @@ static int GetCutColors(Image *image,ExceptionInfo *exception)
         intensity=GetPixelRed(image,q);
       if (intensity >= scale_intensity)
         return(255);
-      q+=GetPixelChannels(image);
+      q+=(ptrdiff_t) GetPixelChannels(image);
     }
   }
   if (intensity < ScaleCharToQuantum(2))
@@ -384,7 +384,7 @@ static Image *ReadCUTImage(const ImageInfo *image_info,ExceptionInfo *exception)
       if (offset < 0)
         ThrowCUTReaderException(CorruptImageError,"ImproperImageHeader");
       if(EOFBlob(image) != MagickFalse) goto CUT_KO;  /*wrong data*/
-      EncodedByte-=i+1;
+      EncodedByte-=(size_t)(i+1);
       ldblk+=(ssize_t) RunCountMasked;
 
       RunCount=(unsigned char) ReadBlobByte(image);
@@ -402,7 +402,7 @@ static Image *ReadCUTImage(const ImageInfo *image_info,ExceptionInfo *exception)
   image->columns=Header.Width;
   image->rows=Header.Height;
   image->depth=8;
-  image->colors=(size_t) (GetQuantumRange(1UL*i)+1);
+  image->colors=(size_t) (GetQuantumRange((size_t) i)+1);
 
   if (image_info->ping != MagickFalse) goto Finish;
   status=SetImageExtent(image,image->columns,image->rows,exception);
@@ -497,21 +497,23 @@ static Image *ReadCUTImage(const ImageInfo *image_info,ExceptionInfo *exception)
           image->colormap[i].red=(Quantum) ReadBlobLSBShort(palette);
           if (QuantumRange != (Quantum) PalHeader.MaxRed)
             {
-              image->colormap[i].red=ClampToQuantum(((double)
-                image->colormap[i].red*QuantumRange+(PalHeader.MaxRed>>1))/
+              image->colormap[i].red=ClampToQuantum((image->colormap[i].red*
+                (double) QuantumRange+(PalHeader.MaxRed >> 1))/
                 PalHeader.MaxRed);
             }
           image->colormap[i].green=(Quantum) ReadBlobLSBShort(palette);
           if (QuantumRange != (Quantum) PalHeader.MaxGreen)
             {
-              image->colormap[i].green=ClampToQuantum
-                (((double) image->colormap[i].green*QuantumRange+(PalHeader.MaxGreen>>1))/PalHeader.MaxGreen);
+              image->colormap[i].green=ClampToQuantum((image->colormap[i].green*
+                (double) QuantumRange+(PalHeader.MaxGreen >> 1))/
+                PalHeader.MaxGreen);
             }
           image->colormap[i].blue=(Quantum) ReadBlobLSBShort(palette);
           if (QuantumRange != (Quantum) PalHeader.MaxBlue)
             {
-              image->colormap[i].blue=ClampToQuantum
-                (((double)image->colormap[i].blue*QuantumRange+(PalHeader.MaxBlue>>1))/PalHeader.MaxBlue);
+              image->colormap[i].blue=ClampToQuantum((image->colormap[i].blue*
+                (double) QuantumRange+(PalHeader.MaxBlue >> 1))/
+                PalHeader.MaxBlue);
             }
 
         }
@@ -615,9 +617,9 @@ static Image *ReadCUTImage(const ImageInfo *image_info,ExceptionInfo *exception)
                     sample;
 
                   sample=ScaleCharToQuantum((unsigned char) i);
-                  if (image->colormap[i].red!=sample) goto Finish;
-                  if (image->colormap[i].green!=sample) goto Finish;
-                  if (image->colormap[i].blue!=sample) goto Finish;
+                  if (image->colormap[i].red != (double) sample) goto Finish;
+                  if (image->colormap[i].green != (double) sample) goto Finish;
+                  if (image->colormap[i].blue != (double) sample) goto Finish;
                 }
 
               image->colormap[1].red=image->colormap[1].green=
@@ -635,7 +637,7 @@ static Image *ReadCUTImage(const ImageInfo *image_info,ExceptionInfo *exception)
                           SetPixelGreen(image,QuantumRange,q);
                           SetPixelBlue(image,QuantumRange,q);
                         }
-                      q+=GetPixelChannels(image);
+                      q+=(ptrdiff_t) GetPixelChannels(image);
                     }
                   if (SyncAuthenticPixels(image,exception) == MagickFalse) goto Finish;
                 }
@@ -653,7 +655,10 @@ static Image *ReadCUTImage(const ImageInfo *image_info,ExceptionInfo *exception)
   if (EOFBlob(image) != MagickFalse)
     ThrowFileException(exception,CorruptImageError,"UnexpectedEndOfFile",
       image->filename);
-  (void) CloseBlob(image);
+  if (CloseBlob(image) == MagickFalse)
+    status=MagickFalse;
+  if (status == MagickFalse)
+    return(DestroyImageList(image));
   return(GetFirstImageInList(image));
 }
 

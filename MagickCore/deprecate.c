@@ -87,6 +87,7 @@
 #include "MagickCore/paint.h"
 #include "MagickCore/pixel.h"
 #include "MagickCore/pixel-accessor.h"
+#include "MagickCore/pixel-private.h"
 #include "MagickCore/quantize.h"
 #include "MagickCore/random_.h"
 #include "MagickCore/resource_.h"
@@ -270,7 +271,7 @@ MagickExport void *CropImageToHBITMAP(Image *image,
       q->rgbGreen = ScaleQuantumToChar(GetPixelGreen(image,p));
       q->rgbBlue = ScaleQuantumToChar(GetPixelBlue(image,p));
       q->rgbReserved = 0;
-      p+=GetPixelChannels(image);
+      p+=(ptrdiff_t) GetPixelChannels(image);
       q++;
     }
     proceed=SetImageProgress(image,CropImageTag,y,page.height);
@@ -380,7 +381,7 @@ MagickExport void *ImageToHBITMAP(Image *image,ExceptionInfo *exception)
       q->rgbGreen=ScaleQuantumToChar(GetPixelGreen(image,p));
       q->rgbBlue=ScaleQuantumToChar(GetPixelBlue(image,p));
       q->rgbReserved=0;
-      p+=GetPixelChannels(image);
+      p+=(ptrdiff_t) GetPixelChannels(image);
       q++;
     }
   }
@@ -401,5 +402,35 @@ MagickExport void *ImageToHBITMAP(Image *image,ExceptionInfo *exception)
   return((void *) bitmapH);
 }
 #endif
+
+/*
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                                                                             %
+%                                                                             %
+%                                                                             %
++   I n i t i a l i z e P i x e l C h a n n e l M a p                         %
+%                                                                             %
+%                                                                             %
+%                                                                             %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+%  InitializePixelChannelMap() defines the standard pixel component map.
+%
+%  The format of the InitializePixelChannelMap() method is:
+%
+%      void InitializePixelChannelMap(Image *image)
+%
+%  A description of each parameter follows:
+%
+%    o image: the image.
+%
+*/
+MagickExport void InitializePixelChannelMap(Image *image)
+{
+  ExceptionInfo
+    *exception = AcquireExceptionInfo();
 
+  (void) ResetPixelChannelMap(image,exception);
+  exception=DestroyExceptionInfo(exception);
+}
 #endif

@@ -1,5 +1,5 @@
 /*
-  Copyright @ 2000 ImageMagick Studio LLC, a non-profit organization
+  Copyright @ 1999 ImageMagick Studio LLC, a non-profit organization
   dedicated to making software imaging solutions freely available.
   
   You may not use this file except in compliance with the License.  You may
@@ -106,7 +106,8 @@ typedef enum
   MagickToolOptions,
   MagickCLIOptions,
   MagickIlluminantOptions,
-  MagickWordBreakOptions
+  MagickWordBreakOptions,
+  MagickPagesizeOptions
 } CommandOption;
 
 typedef enum
@@ -131,7 +132,7 @@ typedef enum
 /*
   Flags to describe classes of image processing options.
   These are used to determine how a option should be processed, and
-  avoid attempting to process all options in every way posible.
+  avoid attempting to process all options in every way possible.
 */
 typedef enum
 {

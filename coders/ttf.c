@@ -240,7 +240,7 @@ static Image *ReadTTFImage(const ImageInfo *image_info,ExceptionInfo *exception)
     for (x=0; x < (ssize_t) image->columns; x++)
     {
       SetPixelViaPixelInfo(image,&background_color,q);
-      q+=GetPixelChannels(image);
+      q+=(ptrdiff_t) GetPixelChannels(image);
     }
     if (SyncAuthenticPixels(image,exception) == MagickFalse)
       break;
@@ -290,9 +290,12 @@ static Image *ReadTTFImage(const ImageInfo *image_info,ExceptionInfo *exception)
   /*
     Relinquish resources.
   */
-  (void) RelinquishUniqueFileResource(draw_info->font);  
+  (void) RelinquishUniqueFileResource(draw_info->font);
   draw_info=DestroyDrawInfo(draw_info);
-  (void) CloseBlob(image);
+  if (CloseBlob(image) == MagickFalse)
+    status=MagickFalse;
+  if (status == MagickFalse)
+    return(DestroyImageList(image));
   return(GetFirstImageInList(image));
 }
 #endif /* MAGICKCORE_FREETYPE_DELEGATE */

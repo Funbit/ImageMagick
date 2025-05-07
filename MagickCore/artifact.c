@@ -17,7 +17,7 @@
 %                                 March 2000                                  %
 %                                                                             %
 %                                                                             %
-%  Copyright @ 2000 ImageMagick Studio LLC, a non-profit organization         %
+%  Copyright @ 1999 ImageMagick Studio LLC, a non-profit organization         %
 %  dedicated to making software imaging solutions freely available.           %
 %                                                                             %
 %  You may not use this file except in compliance with the License.  You may  %
@@ -94,7 +94,7 @@
 %
 %  A description of each parameter follows:
 %
-%    o image: the image, to recieve the cloned artifacts.
+%    o image: the image, to receive the cloned artifacts.
 %
 %    o clone_image: the source image for artifacts to clone.
 %
@@ -134,7 +134,7 @@ MagickExport MagickBooleanType CloneImageArtifacts(Image *image,
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  DefineImageArtifact() associates an assignment string of the form
-%  "key=value" with per-image artifact. It is equivelent to
+%  "key=value" with per-image artifact. It is equivalent to
 %  SetImageArtifact().
 %
 %  The format of the DefineImageArtifact method is:

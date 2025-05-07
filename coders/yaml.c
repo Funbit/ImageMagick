@@ -17,7 +17,7 @@
 %                                January 2014                                 %
 %                                                                             %
 %                                                                             %
-%  Copyright @ 2014 ImageMagick Studio LLC, a non-profit organization         %
+%  Copyright @ 1999 ImageMagick Studio LLC, a non-profit organization         %
 %  dedicated to making software imaging solutions freely available.           %
 %                                                                             %
 %  You may not use this file except in compliance with the License.  You may  %
@@ -300,7 +300,7 @@ static void YAMLFormatLocaleFile(FILE *file,const char *format,
         if (((int) *p >= 0x00) && ((int) *p <= 0x1f))
           {
             (void) FormatLocaleString(q,7,"\\u%04X",(int) *p);
-            q+=6;
+            q+=(ptrdiff_t) 6;
             break;
           }
         *q++=(*p);
@@ -369,7 +369,7 @@ static ChannelStatistics *GetLocationStatistics(const Image *image,
     {
       if (GetPixelReadMask(image,p) <= (QuantumRange/2))
         {
-          p+=GetPixelChannels(image);
+          p+=(ptrdiff_t) GetPixelChannels(image);
           continue;
         }
       for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
@@ -395,7 +395,7 @@ static ChannelStatistics *GetLocationStatistics(const Image *image,
           }
         }
       }
-      p+=GetPixelChannels(image);
+      p+=(ptrdiff_t) GetPixelChannels(image);
     }
   }
   return(channel_statistics);
@@ -591,7 +591,7 @@ static ssize_t PrintChannelLocations(FILE *file,const Image *image,
       if (traits == UndefinedPixelTrait)
         continue;
       offset=GetPixelChannelOffset(image,channel);
-      match=fabs((double) (p[offset]-target)) < 0.5 ? MagickTrue : MagickFalse;
+      match=fabs(((double) p[offset]-target)) < 0.5 ? MagickTrue : MagickFalse;
       if (match != MagickFalse)
         {
           if ((max_locations != 0) && (n >= (ssize_t) max_locations))
@@ -603,7 +603,7 @@ static ssize_t PrintChannelLocations(FILE *file,const Image *image,
             "        ",(double) n,(double) x,(double) y);
           n++;
         }
-      p+=GetPixelChannels(image);
+      p+=(ptrdiff_t) GetPixelChannels(image);
     }
     if (x < (ssize_t) image->columns)
       break;
@@ -949,17 +949,18 @@ static MagickBooleanType EncodeImageAttributes(Image *image,FILE *file,
   MagickBooleanType
     ping;
 
-  ssize_t
-    i,
-    x;
-
   size_t
     depth,
     distance,
     scale;
 
   ssize_t
+    i,
+    x,
     y;
+
+  struct stat
+    properties;
 
   assert(image != (Image *) NULL);
   assert(image->signature == MagickCoreSignature);
@@ -997,12 +998,17 @@ static MagickBooleanType EncodeImageAttributes(Image *image,FILE *file,
           YAMLFormatLocaleFile(file,"    baseName: %s\n",filename);
         }
     }
+  properties=(*GetBlobProperties(image));
+  if (properties.st_mode != 0)
+    (void) FormatLocaleFile(file,"    permissions: %d%d%d\n",
+      (properties.st_mode >> 6) & 0x07,(properties.st_mode >> 3) & 0x07,
+      (properties.st_mode >> 0) & 0x07);
   YAMLFormatLocaleFile(file,"    format: %s\n",image->magick);
   magick_info=GetMagickInfo(image->magick,exception);
   if ((magick_info != (const MagickInfo *) NULL) &&
       (GetMagickDescription(magick_info) != (const char *) NULL))
     YAMLFormatLocaleFile(file,"    formatDescription: %s\n",
-      image->magick);
+      GetMagickDescription(magick_info));
   if ((magick_info != (const MagickInfo *) NULL) &&
       (GetMagickMimeType(magick_info) != (const char *) NULL))
     YAMLFormatLocaleFile(file,"    mimeType: %s\n",GetMagickMimeType(
@@ -1357,7 +1363,7 @@ static MagickBooleanType EncodeImageAttributes(Image *image,FILE *file,
           {
             if (GetPixelAlpha(image,p) == (Quantum) TransparentAlpha)
               break;
-            p+=GetPixelChannels(image);
+            p+=(ptrdiff_t) GetPixelChannels(image);
           }
           if (x < (ssize_t) image->columns)
             break;
@@ -1722,6 +1728,7 @@ static MagickBooleanType WriteYAMLImage(const ImageInfo *image_info,
     if (status == MagickFalse)
       break;
   } while (image_info->adjoin != MagickFalse);
-  (void) CloseBlob(image);
-  return(MagickTrue);
+  if (CloseBlob(image) == MagickFalse)
+    status=MagickFalse;
+  return(status);
 }

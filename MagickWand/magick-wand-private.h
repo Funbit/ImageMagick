@@ -1,5 +1,5 @@
 /*
-  Copyright @ 2003 ImageMagick Studio LLC, a non-profit organization
+  Copyright @ 1999 ImageMagick Studio LLC, a non-profit organization
   dedicated to making software imaging solutions freely available.
   
   You may not use this file except in compliance with the License.  You may
@@ -46,7 +46,7 @@ extern "C" {
   _exit((int) (severity-FatalErrorException)+1); \
 }
 
-static inline void CheckMagickCoreCompatibility()
+static inline void CheckMagickCoreCompatibility(void)
 {
   const char
     *quantum;

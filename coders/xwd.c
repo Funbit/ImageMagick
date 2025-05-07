@@ -430,7 +430,7 @@ static Image *ReadXWDImage(const ImageInfo *image_info,ExceptionInfo *exception)
   /*
     Allocate the pixel buffer.
   */
-  length=(size_t) ximage->bytes_per_line*ximage->height;
+  length=(size_t) (ximage->bytes_per_line*ximage->height);
   if (CheckOverflowException(length,ximage->bytes_per_line,ximage->height))
     {
       if (header.ncolors != 0)
@@ -444,7 +444,7 @@ static Image *ReadXWDImage(const ImageInfo *image_info,ExceptionInfo *exception)
         extent;
 
       extent=length;
-      length*=ximage->depth;
+      length*=(size_t) ximage->depth;
       if (CheckOverflowException(length,extent,ximage->depth))
         {
           if (header.ncolors != 0)
@@ -544,19 +544,19 @@ static Image *ReadXWDImage(const ImageInfo *image_info,ExceptionInfo *exception)
             for (x=0; x < (ssize_t) image->columns; x++)
             {
               pixel=XGetPixel(ximage,(int) x,(int) y);
-              index=(Quantum) ConstrainColormapIndex(image,(ssize_t) (pixel >>
-                red_shift) & red_mask,exception);
+              index=(Quantum) ConstrainColormapIndex(image,(ssize_t) ((pixel >>
+                red_shift) & red_mask),exception);
               SetPixelRed(image,ScaleShortToQuantum(
                 colors[(ssize_t) index].red),q);
-              index=(Quantum) ConstrainColormapIndex(image,(ssize_t) (pixel >>
-                green_shift) & green_mask,exception);
+              index=(Quantum) ConstrainColormapIndex(image,(ssize_t) ((pixel >>
+                green_shift) & green_mask),exception);
               SetPixelGreen(image,ScaleShortToQuantum(
                 colors[(ssize_t) index].green),q);
-              index=(Quantum) ConstrainColormapIndex(image,(ssize_t) (pixel >>
-                blue_shift) & blue_mask,exception);
+              index=(Quantum) ConstrainColormapIndex(image,(ssize_t) ((pixel >>
+                blue_shift) & blue_mask),exception);
               SetPixelBlue(image,ScaleShortToQuantum(
                 colors[(ssize_t) index].blue),q);
-              q+=GetPixelChannels(image);
+              q+=(ptrdiff_t) GetPixelChannels(image);
             }
             if (SyncAuthenticPixels(image,exception) == MagickFalse)
               break;
@@ -587,7 +587,7 @@ static Image *ReadXWDImage(const ImageInfo *image_info,ExceptionInfo *exception)
               if (blue_mask != 0)
                 color=(color*65535UL)/blue_mask;
               SetPixelBlue(image,ScaleShortToQuantum((unsigned short) color),q);
-              q+=GetPixelChannels(image);
+              q+=(ptrdiff_t) GetPixelChannels(image);
             }
             if (SyncAuthenticPixels(image,exception) == MagickFalse)
               break;
@@ -631,7 +631,7 @@ static Image *ReadXWDImage(const ImageInfo *image_info,ExceptionInfo *exception)
               XGetPixel(ximage,(int) x,(int) y),exception);
             SetPixelIndex(image,index,q);
             SetPixelViaPixelInfo(image,image->colormap+(ssize_t) index,q);
-            q+=GetPixelChannels(image);
+            q+=(ptrdiff_t) GetPixelChannels(image);
           }
           if (SyncAuthenticPixels(image,exception) == MagickFalse)
             break;
@@ -653,7 +653,10 @@ static Image *ReadXWDImage(const ImageInfo *image_info,ExceptionInfo *exception)
   if (EOFBlob(image) != MagickFalse)
     ThrowFileException(exception,CorruptImageError,"UnexpectedEndOfFile",
       image->filename);
-  (void) CloseBlob(image);
+  if (CloseBlob(image) == MagickFalse)
+    status=MagickFalse;
+  if (status == MagickFalse)
+    return(DestroyImageList(image));
   return(GetFirstImageInList(image));
 }
 #endif
@@ -936,7 +939,7 @@ static MagickBooleanType WriteXWDImage(const ImageInfo *image_info,Image *image,
         for (x=0; x < (ssize_t) image->columns; x++)
         {
           *q++=(unsigned char) ((ssize_t) GetPixelIndex(image,p));
-          p+=GetPixelChannels(image);
+          p+=(ptrdiff_t) GetPixelChannels(image);
         }
       }
     else
@@ -945,7 +948,7 @@ static MagickBooleanType WriteXWDImage(const ImageInfo *image_info,Image *image,
         *q++=ScaleQuantumToChar(GetPixelRed(image,p));
         *q++=ScaleQuantumToChar(GetPixelGreen(image,p));
         *q++=ScaleQuantumToChar(GetPixelBlue(image,p));
-        p+=GetPixelChannels(image);
+        p+=(ptrdiff_t) GetPixelChannels(image);
       }
     for (x=0; x < (ssize_t) scanline_pad; x++)
       *q++='\0';

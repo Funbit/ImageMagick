@@ -88,6 +88,7 @@
 #include "MagickCore/semaphore.h"
 #include "MagickCore/signature-private.h"
 #include "MagickCore/statistic.h"
+#include "MagickCore/statistic-private.h"
 #include "MagickCore/string_.h"
 #include "MagickCore/thread-private.h"
 #include "MagickCore/timer.h"
@@ -252,12 +253,12 @@ static double ApplyEvaluateOperator(RandomInfo *random_info,const Quantum pixel,
       break;
     case AbsEvaluateOperator:
     {
-      result=(double) fabs((double) (pixel+value));
+      result=(double) fabs((double) pixel+value);
       break;
     }
     case AddEvaluateOperator:
     {
-      result=(double) (pixel+value);
+      result=(double) pixel+value;
       break;
     }
     case AddModulusEvaluateOperator:
@@ -268,8 +269,9 @@ static double ApplyEvaluateOperator(RandomInfo *random_info,const Quantum pixel,
         result, where floor() is replaced by trunc() and could return a
         negative result (which is clipped).
       */
-      result=pixel+value;
-      result-=(QuantumRange+1.0)*floor((double) result/(QuantumRange+1.0));
+      result=(double) pixel+value;
+      result-=((double) QuantumRange+1.0)*floor(result/((double)
+        QuantumRange+1.0));
       break;
     }
     case AndEvaluateOperator:
@@ -279,18 +281,18 @@ static double ApplyEvaluateOperator(RandomInfo *random_info,const Quantum pixel,
     }
     case CosineEvaluateOperator:
     {
-      result=(double) (QuantumRange*(0.5*cos((double) (2.0*MagickPI*
-        QuantumScale*pixel*value))+0.5));
+      result=(double) QuantumRange*(0.5*cos((double) (2.0*MagickPI*
+        QuantumScale*(double) pixel*value))+0.5);
       break;
     }
     case DivideEvaluateOperator:
     {
-      result=pixel/(value == 0.0 ? 1.0 : value);
+      result=(double) pixel/(value == 0.0 ? 1.0 : value);
       break;
     }
     case ExponentialEvaluateOperator:
     {
-      result=(double) (QuantumRange*exp((double) (value*QuantumScale*pixel)));
+      result=(double) QuantumRange*exp(value*QuantumScale*(double) pixel);
       break;
     }
     case GaussianNoiseEvaluateOperator:
@@ -307,8 +309,8 @@ static double ApplyEvaluateOperator(RandomInfo *random_info,const Quantum pixel,
     }
     case InverseLogEvaluateOperator:
     {
-      result=(QuantumRange*pow((value+1.0),QuantumScale*pixel)-1.0)*
-        PerceptibleReciprocal(value);
+      result=(double) QuantumRange*pow((value+1.0),QuantumScale*(double)
+        pixel-1.0)*PerceptibleReciprocal(value);
       break;
     }
     case LaplacianNoiseEvaluateOperator:
@@ -326,9 +328,9 @@ static double ApplyEvaluateOperator(RandomInfo *random_info,const Quantum pixel,
     }
     case LogEvaluateOperator:
     {
-      if ((QuantumScale*pixel) >= MagickEpsilon)
-        result=(double) (QuantumRange*log((double) (QuantumScale*value*pixel+
-          1.0))/log((double) (value+1.0)));
+      if ((QuantumScale*(double) pixel) >= MagickEpsilon)
+        result=(double) QuantumRange*log(QuantumScale*value*
+          (double) pixel+1.0)/log((double) (value+1.0));
       break;
     }
     case MaxEvaluateOperator:
@@ -338,17 +340,17 @@ static double ApplyEvaluateOperator(RandomInfo *random_info,const Quantum pixel,
     }
     case MeanEvaluateOperator:
     {
-      result=(double) (pixel+value);
+      result=(double) pixel+value;
       break;
     }
     case MedianEvaluateOperator:
     {
-      result=(double) (pixel+value);
+      result=(double) pixel+value;
       break;
     }
     case MinEvaluateOperator:
     {
-      result=(double) MagickMin((double) pixel,value);
+      result=MagickMin((double) pixel,value);
       break;
     }
     case MultiplicativeNoiseEvaluateOperator:
@@ -359,7 +361,7 @@ static double ApplyEvaluateOperator(RandomInfo *random_info,const Quantum pixel,
     }
     case MultiplyEvaluateOperator:
     {
-      result=(double) (value*pixel);
+      result=(double) pixel*value;
       break;
     }
     case OrEvaluateOperator:
@@ -375,12 +377,13 @@ static double ApplyEvaluateOperator(RandomInfo *random_info,const Quantum pixel,
     }
     case PowEvaluateOperator:
     {
-      if ((pixel < 0) && ((value-floor(value)) > MagickEpsilon))
-        result=(double) -(QuantumRange*pow((double) -(QuantumScale*pixel),
-          (double) value));
+      if (fabs(value) <= MagickEpsilon)
+        break;
+      if (((double) pixel < 0.0) && ((value-floor(value)) > MagickEpsilon))
+        result=(double) -((double) QuantumRange*pow(-(QuantumScale*(double)
+          pixel),value));
       else
-        result=(double) (QuantumRange*pow((double) (QuantumScale*pixel),
-          (double) value));
+        result=(double) QuantumRange*pow(QuantumScale*(double) pixel,value);
       break;
     }
     case RightShiftEvaluateOperator:
@@ -392,7 +395,7 @@ static double ApplyEvaluateOperator(RandomInfo *random_info,const Quantum pixel,
     }
     case RootMeanSquareEvaluateOperator:
     {
-      result=((double) pixel*pixel+value);
+      result=((double) pixel*(double) pixel+value);
       break;
     }
     case SetEvaluateOperator:
@@ -402,18 +405,18 @@ static double ApplyEvaluateOperator(RandomInfo *random_info,const Quantum pixel,
     }
     case SineEvaluateOperator:
     {
-      result=(double) (QuantumRange*(0.5*sin((double) (2.0*MagickPI*
-        QuantumScale*pixel*value))+0.5));
+      result=(double) QuantumRange*(0.5*sin((double) (2.0*MagickPI*
+        QuantumScale*(double) pixel*value))+0.5);
       break;
     }
     case SubtractEvaluateOperator:
     {
-      result=(double) (pixel-value);
+      result=(double) pixel-value;
       break;
     }
     case SumEvaluateOperator:
     {
-      result=(double) (pixel+value);
+      result=(double) pixel+value;
       break;
     }
     case ThresholdEvaluateOperator:
@@ -635,7 +638,7 @@ MagickExport Image *EvaluateImages(const Image *images,
                 random_info[id],GetPixelChannel(next,channel,p[j]),op,
                 evaluate_pixel[j].channel[i]);
             }
-            p[j]+=GetPixelChannels(next);
+            p[j]+=(ptrdiff_t) GetPixelChannels(next);
             next=GetNextImageInList(next);
           }
           qsort((void *) evaluate_pixel,number_images,sizeof(*evaluate_pixel),
@@ -649,7 +652,7 @@ MagickExport Image *EvaluateImages(const Image *images,
               continue;
             q[i]=ClampToQuantum(evaluate_pixel[number_images/2].channel[i]);
           }
-          q+=GetPixelChannels(image);
+          q+=(ptrdiff_t) GetPixelChannels(image);
         }
         p=(const Quantum **) RelinquishMagickMemory((void *) p);
         if (SyncCacheViewAuthenticPixels(evaluate_view,exception) == MagickFalse)
@@ -749,7 +752,7 @@ MagickExport Image *EvaluateImages(const Image *images,
                 random_info[id],GetPixelChannel(next,channel,p[j]),j == 0 ?
                 AddEvaluateOperator : op,evaluate_pixel[x].channel[i]);
             }
-            p[j]+=GetPixelChannels(next);
+            p[j]+=(ptrdiff_t) GetPixelChannels(next);
           }
           next=GetNextImageInList(next);
         }
@@ -794,7 +797,7 @@ MagickExport Image *EvaluateImages(const Image *images,
               continue;
             q[i]=ClampToQuantum(evaluate_pixel[x].channel[i]);
           }
-          q+=GetPixelChannels(image);
+          q+=(ptrdiff_t) GetPixelChannels(image);
         }
         p=(const Quantum **) RelinquishMagickMemory((void *) p);
         if (SyncCacheViewAuthenticPixels(evaluate_view,exception) == MagickFalse)
@@ -916,7 +919,7 @@ MagickExport MagickBooleanType EvaluateImage(Image *image,
           result/=2.0;
         q[i]=clamp != MagickFalse ? ClampPixel(result) : ClampToQuantum(result);
       }
-      q+=GetPixelChannels(image);
+      q+=(ptrdiff_t) GetPixelChannels(image);
     }
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
       status=MagickFalse;
@@ -995,8 +998,8 @@ static Quantum ApplyFunction(Quantum pixel,const MagickFunction function,
       */
       result=0.0;
       for (i=0; i < (ssize_t) number_parameters; i++)
-        result=result*QuantumScale*pixel+parameters[i];
-      result*=QuantumRange;
+        result=result*QuantumScale*(double) pixel+parameters[i];
+      result*=(double) QuantumRange;
       break;
     }
     case SinusoidFunction:
@@ -1014,8 +1017,8 @@ static Quantum ApplyFunction(Quantum pixel,const MagickFunction function,
       phase=(number_parameters >= 2) ? parameters[1] : 0.0;
       amplitude=(number_parameters >= 3) ? parameters[2] : 0.5;
       bias=(number_parameters >= 4) ? parameters[3] : 0.5;
-      result=(double) (QuantumRange*(amplitude*sin((double) (2.0*
-        MagickPI*(frequency*QuantumScale*pixel+phase/360.0)))+bias));
+      result=(double) QuantumRange*(amplitude*sin((double) (2.0*
+        MagickPI*(frequency*QuantumScale*(double) pixel+phase/360.0)))+bias);
       break;
     }
     case ArcsinFunction:
@@ -1027,14 +1030,15 @@ static Quantum ApplyFunction(Quantum pixel,const MagickFunction function,
         width;
 
       /*
-        Arcsin (peged at range limits for invalid results): width, center,
+        Arcsin (pegged at range limits for invalid results): width, center,
         range, and bias.
       */
       width=(number_parameters >= 1) ? parameters[0] : 1.0;
       center=(number_parameters >= 2) ? parameters[1] : 0.5;
       range=(number_parameters >= 3) ? parameters[2] : 1.0;
       bias=(number_parameters >= 4) ? parameters[3] : 0.5;
-      result=2.0*PerceptibleReciprocal(width)*(QuantumScale*pixel-center);
+      result=2.0*PerceptibleReciprocal(width)*(QuantumScale*(double) pixel-
+        center);
       if (result <= -1.0)
         result=bias-range/2.0;
       else
@@ -1042,7 +1046,7 @@ static Quantum ApplyFunction(Quantum pixel,const MagickFunction function,
           result=bias+range/2.0;
         else
           result=(double) (range/MagickPI*asin((double) result)+bias);
-      result*=QuantumRange;
+      result*=(double) QuantumRange;
       break;
     }
     case ArctanFunction:
@@ -1060,9 +1064,8 @@ static Quantum ApplyFunction(Quantum pixel,const MagickFunction function,
       center=(number_parameters >= 2) ? parameters[1] : 0.5;
       range=(number_parameters >= 3) ? parameters[2] : 1.0;
       bias=(number_parameters >= 4) ? parameters[3] : 0.5;
-      result=(double) (MagickPI*slope*(QuantumScale*pixel-center));
-      result=(double) (QuantumRange*(range/MagickPI*atan((double)
-        result)+bias));
+      result=MagickPI*slope*(QuantumScale*(double) pixel-center);
+      result=(double) QuantumRange*(range/MagickPI*atan((double) result)+bias);
       break;
     }
     case UndefinedFunction:
@@ -1141,7 +1144,7 @@ MagickExport MagickBooleanType FunctionImage(Image *image,
         q[i]=ApplyFunction(q[i],function,number_parameters,parameters,
           exception);
       }
-      q+=GetPixelChannels(image);
+      q+=(ptrdiff_t) GetPixelChannels(image);
     }
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
       status=MagickFalse;
@@ -1202,7 +1205,10 @@ MagickExport MagickBooleanType GetImageEntropy(const Image *image,
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
   channel_statistics=GetImageStatistics(image,exception);
   if (channel_statistics == (ChannelStatistics *) NULL)
-    return(MagickFalse);
+    {
+      *entropy=NAN;
+      return(MagickFalse);
+    }
   *entropy=channel_statistics[CompositePixelChannel].entropy;
   channel_statistics=(ChannelStatistics *) RelinquishMagickMemory(
     channel_statistics);
@@ -1300,7 +1306,11 @@ MagickExport MagickBooleanType GetImageKurtosis(const Image *image,
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
   channel_statistics=GetImageStatistics(image,exception);
   if (channel_statistics == (ChannelStatistics *) NULL)
-    return(MagickFalse);
+    {
+      *kurtosis=NAN;
+      *skewness=NAN;
+      return(MagickFalse);
+    }
   *kurtosis=channel_statistics[CompositePixelChannel].kurtosis;
   *skewness=channel_statistics[CompositePixelChannel].skewness;
   channel_statistics=(ChannelStatistics *) RelinquishMagickMemory(
@@ -1350,7 +1360,11 @@ MagickExport MagickBooleanType GetImageMean(const Image *image,double *mean,
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
   channel_statistics=GetImageStatistics(image,exception);
   if (channel_statistics == (ChannelStatistics *) NULL)
-    return(MagickFalse);
+    {
+      *mean=NAN;
+      *standard_deviation=NAN;
+      return(MagickFalse);
+    }
   *mean=channel_statistics[CompositePixelChannel].mean;
   *standard_deviation=
     channel_statistics[CompositePixelChannel].standard_deviation;
@@ -1398,7 +1412,10 @@ MagickExport MagickBooleanType GetImageMedian(const Image *image,double *median,
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
   channel_statistics=GetImageStatistics(image,exception);
   if (channel_statistics == (ChannelStatistics *) NULL)
-    return(MagickFalse);
+    {
+      *median=NAN;
+      return(MagickFalse);
+    }
   *median=channel_statistics[CompositePixelChannel].median;
   channel_statistics=(ChannelStatistics *) RelinquishMagickMemory(
     channel_statistics);
@@ -1513,14 +1530,14 @@ MagickExport ChannelMoments *GetImageMoments(const Image *image,
           continue;
         if ((traits & UpdatePixelTrait) == 0)
           continue;
-        M00[channel]+=QuantumScale*p[i];
-        M00[MaxPixelChannels]+=QuantumScale*p[i];
-        M10[channel]+=x*QuantumScale*p[i];
-        M10[MaxPixelChannels]+=x*QuantumScale*p[i];
-        M01[channel]+=y*QuantumScale*p[i];
-        M01[MaxPixelChannels]+=y*QuantumScale*p[i];
+        M00[channel]+=QuantumScale*(double) p[i];
+        M00[MaxPixelChannels]+=QuantumScale*(double) p[i];
+        M10[channel]+=x*QuantumScale*(double) p[i];
+        M10[MaxPixelChannels]+=x*QuantumScale*(double) p[i];
+        M01[channel]+=y*QuantumScale*(double) p[i];
+        M01[MaxPixelChannels]+=y*QuantumScale*(double) p[i];
       }
-      p+=GetPixelChannels(image);
+      p+=(ptrdiff_t) GetPixelChannels(image);
     }
   }
   for (c=0; c <= MaxPixelChannels; c++)
@@ -1559,39 +1576,41 @@ MagickExport ChannelMoments *GetImageMoments(const Image *image,
         if ((traits & UpdatePixelTrait) == 0)
           continue;
         M11[channel]+=(x-centroid[channel].x)*(y-centroid[channel].y)*
-          QuantumScale*p[i];
+          QuantumScale*(double) p[i];
         M11[MaxPixelChannels]+=(x-centroid[channel].x)*(y-centroid[channel].y)*
-          QuantumScale*p[i];
+          QuantumScale*(double) p[i];
         M20[channel]+=(x-centroid[channel].x)*(x-centroid[channel].x)*
-          QuantumScale*p[i];
+          QuantumScale*(double) p[i];
         M20[MaxPixelChannels]+=(x-centroid[channel].x)*(x-centroid[channel].x)*
-          QuantumScale*p[i];
+          QuantumScale*(double) p[i];
         M02[channel]+=(y-centroid[channel].y)*(y-centroid[channel].y)*
-          QuantumScale*p[i];
+          QuantumScale*(double) p[i];
         M02[MaxPixelChannels]+=(y-centroid[channel].y)*(y-centroid[channel].y)*
-          QuantumScale*p[i];
+          QuantumScale*(double) p[i];
         M21[channel]+=(x-centroid[channel].x)*(x-centroid[channel].x)*
-          (y-centroid[channel].y)*QuantumScale*p[i];
+          (y-centroid[channel].y)*QuantumScale*(double) p[i];
         M21[MaxPixelChannels]+=(x-centroid[channel].x)*(x-centroid[channel].x)*
-          (y-centroid[channel].y)*QuantumScale*p[i];
+          (y-centroid[channel].y)*QuantumScale*(double) p[i];
         M12[channel]+=(x-centroid[channel].x)*(y-centroid[channel].y)*
-          (y-centroid[channel].y)*QuantumScale*p[i];
+          (y-centroid[channel].y)*QuantumScale*(double) p[i];
         M12[MaxPixelChannels]+=(x-centroid[channel].x)*(y-centroid[channel].y)*
-          (y-centroid[channel].y)*QuantumScale*p[i];
+          (y-centroid[channel].y)*QuantumScale*(double) p[i];
         M22[channel]+=(x-centroid[channel].x)*(x-centroid[channel].x)*
-          (y-centroid[channel].y)*(y-centroid[channel].y)*QuantumScale*p[i];
+          (y-centroid[channel].y)*(y-centroid[channel].y)*QuantumScale*(double)
+          p[i];
         M22[MaxPixelChannels]+=(x-centroid[channel].x)*(x-centroid[channel].x)*
-          (y-centroid[channel].y)*(y-centroid[channel].y)*QuantumScale*p[i];
+          (y-centroid[channel].y)*(y-centroid[channel].y)*QuantumScale*(double)
+          p[i];
         M30[channel]+=(x-centroid[channel].x)*(x-centroid[channel].x)*
-          (x-centroid[channel].x)*QuantumScale*p[i];
+          (x-centroid[channel].x)*QuantumScale*(double) p[i];
         M30[MaxPixelChannels]+=(x-centroid[channel].x)*(x-centroid[channel].x)*
-          (x-centroid[channel].x)*QuantumScale*p[i];
+          (x-centroid[channel].x)*QuantumScale*(double) p[i];
         M03[channel]+=(y-centroid[channel].y)*(y-centroid[channel].y)*
-          (y-centroid[channel].y)*QuantumScale*p[i];
+          (y-centroid[channel].y)*QuantumScale*(double) p[i];
         M03[MaxPixelChannels]+=(y-centroid[channel].y)*(y-centroid[channel].y)*
-          (y-centroid[channel].y)*QuantumScale*p[i];
+          (y-centroid[channel].y)*QuantumScale*(double) p[i];
       }
-      p+=GetPixelChannels(image);
+      p+=(ptrdiff_t) GetPixelChannels(image);
     }
   }
   channels=(double) GetImageChannels(image);
@@ -1723,16 +1742,6 @@ MagickExport ChannelMoments *GetImageMoments(const Image *image,
 %    o exception: return any errors or warnings in this structure.
 %
 */
-
-static inline double MagickLog10(const double x)
-{
-#define Log10Epsilon  (1.0e-11)
-
-  if (fabs(x) < Log10Epsilon)
-    return(log10(Log10Epsilon));
-  return(log10(fabs(x)));
-}
-
 MagickExport ChannelPerceptualHash *GetImagePerceptualHash(const Image *image,
   ExceptionInfo *exception)
 {
@@ -1758,10 +1767,10 @@ MagickExport ChannelPerceptualHash *GetImagePerceptualHash(const Image *image,
   if (perceptual_hash == (ChannelPerceptualHash *) NULL)
     return((ChannelPerceptualHash *) NULL);
   artifact=GetImageArtifact(image,"phash:colorspaces");
-  if (artifact != NULL)
+  if (artifact != (const char *) NULL)
     colorspaces=AcquireString(artifact);
   else
-    colorspaces=AcquireString("sRGB,HCLp");
+    colorspaces=AcquireString("xyY,HSB");
   perceptual_hash[0].number_colorspaces=0;
   perceptual_hash[0].number_channels=0;
   q=colorspaces;
@@ -1846,7 +1855,6 @@ MagickExport MagickBooleanType GetImageRange(const Image *image,double *minima,
     *image_view;
 
   MagickBooleanType
-    initialize,
     status;
 
   ssize_t
@@ -1857,22 +1865,18 @@ MagickExport MagickBooleanType GetImageRange(const Image *image,double *minima,
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
   status=MagickTrue;
-  initialize=MagickTrue;
-  *maxima=0.0;
-  *minima=0.0;
+  *maxima=MagickMinimumValue;
+  *minima=MagickMaximumValue;
   image_view=AcquireVirtualCacheView(image,exception);
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
-  #pragma omp parallel for schedule(static) shared(status,initialize) \
+  #pragma omp parallel for schedule(static) shared(status) \
     magick_number_threads(image,image,image->rows,1)
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
     double
-      row_maxima = 0.0,
-      row_minima = 0.0;
-
-    MagickBooleanType
-      row_initialize;
+      row_maxima = MagickMinimumValue,
+      row_minima = MagickMaximumValue;
 
     const Quantum
       *magick_restrict p;
@@ -1888,7 +1892,6 @@ MagickExport MagickBooleanType GetImageRange(const Image *image,double *minima,
         status=MagickFalse;
         continue;
       }
-    row_initialize=MagickTrue;
     for (x=0; x < (ssize_t) image->columns; x++)
     {
       ssize_t
@@ -1902,39 +1905,21 @@ MagickExport MagickBooleanType GetImageRange(const Image *image,double *minima,
           continue;
         if ((traits & UpdatePixelTrait) == 0)
           continue;
-				if (row_initialize != MagickFalse)
-          {
-            row_minima=(double) p[i];
-            row_maxima=(double) p[i];
-            row_initialize=MagickFalse;
-          }
-        else
-          {
-            if ((double) p[i] < row_minima)
-              row_minima=(double) p[i];
-            if ((double) p[i] > row_maxima)
-              row_maxima=(double) p[i];
-         }
+        if ((double) p[i] < row_minima)
+          row_minima=(double) p[i];
+        if ((double) p[i] > row_maxima)
+          row_maxima=(double) p[i];
       }
-      p+=GetPixelChannels(image);
+      p+=(ptrdiff_t) GetPixelChannels(image);
     }
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
-#pragma omp critical (MagickCore_GetImageRange)
+    #pragma omp critical (MagickCore_GetImageRange)
 #endif
     {
-      if (initialize != MagickFalse)
-        {
-          *minima=row_minima;
-          *maxima=row_maxima;
-          initialize=MagickFalse;
-        }
-      else
-        {
-          if (row_minima < *minima)
-            *minima=row_minima;
-          if (row_maxima > *maxima)
-            *maxima=row_maxima;
-        }
+      if (row_minima < *minima)
+        *minima=row_minima;
+      if (row_maxima > *maxima)
+        *maxima=row_maxima;
     }
   }
   image_view=DestroyCacheView(image_view);
@@ -2026,6 +2011,20 @@ static ssize_t GetMedianPixel(Quantum *pixels,const size_t n)
   }
 }
 
+static inline long double PerceptibleReciprocalLD(const long double x)
+{
+  long double
+    sign;
+
+  /*
+    Return 1/x where x is perceptible (not unlimited or infinitesimal).
+  */
+  sign=x < 0.0 ? -1.0 : 1.0;
+  if ((sign*x) >= MagickEpsilon)
+    return(1.0/x);
+  return(sign/MagickEpsilon);
+}
+
 MagickExport ChannelStatistics *GetImageStatistics(const Image *image,
   ExceptionInfo *exception)
 {
@@ -2033,10 +2032,11 @@ MagickExport ChannelStatistics *GetImageStatistics(const Image *image,
     *channel_statistics;
 
   double
+    *histogram;
+
+  long double
     area,
-    channels,
-    *histogram,
-    standard_deviation;
+    channels;
 
   MagickStatusType
     status;
@@ -2061,8 +2061,8 @@ MagickExport ChannelStatistics *GetImageStatistics(const Image *image,
   assert(image->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  histogram=(double *) AcquireQuantumMemory(MaxMap+1UL,GetPixelChannels(image)*
-    sizeof(*histogram));
+  histogram=(double *) AcquireQuantumMemory(MaxMap+1UL,
+    MagickMax(GetPixelChannels(image),1)*sizeof(*histogram));
   channel_statistics=(ChannelStatistics *) AcquireQuantumMemory(
     MaxPixelChannels+1,sizeof(*channel_statistics));
   if ((channel_statistics == (ChannelStatistics *) NULL) ||
@@ -2073,15 +2073,27 @@ MagickExport ChannelStatistics *GetImageStatistics(const Image *image,
       if (channel_statistics != (ChannelStatistics *) NULL)
         channel_statistics=(ChannelStatistics *) RelinquishMagickMemory(
           channel_statistics);
+      (void) ThrowMagickException(exception,GetMagickModule(),
+        ResourceLimitError,"MemoryAllocationFailed","`%s'",image->filename);
       return(channel_statistics);
     }
   (void) memset(channel_statistics,0,(MaxPixelChannels+1)*
     sizeof(*channel_statistics));
   for (i=0; i <= (ssize_t) MaxPixelChannels; i++)
   {
-    channel_statistics[i].depth=1;
-    channel_statistics[i].maxima=(-MagickMaximumValue);
-    channel_statistics[i].minima=MagickMaximumValue;
+    ChannelStatistics *cs = channel_statistics+i;
+    cs->area=0.0;
+    cs->depth=1;
+    cs->maxima=(-MagickMaximumValue);
+    cs->minima=MagickMaximumValue;
+    cs->sum=0.0;
+    cs->sumLD=0.0;
+    cs->mean=0.0;
+    cs->standard_deviation=0.0;
+    cs->variance=0.0;
+    cs->skewness=0.0;
+    cs->kurtosis=0.0;
+    cs->entropy=0.0;
   }
   (void) memset(histogram,0,(MaxMap+1)*GetPixelChannels(image)*
     sizeof(*histogram));
@@ -2103,80 +2115,116 @@ MagickExport ChannelStatistics *GetImageStatistics(const Image *image,
     {
       if (GetPixelReadMask(image,p) <= (QuantumRange/2))
         {
-          p+=GetPixelChannels(image);
+          p+=(ptrdiff_t) GetPixelChannels(image);
           continue;
         }
       for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
       {
+        ChannelStatistics
+          *cs;
+
         PixelChannel channel = GetPixelChannelChannel(image,i);
         PixelTrait traits = GetPixelChannelTraits(image,channel);
         if (traits == UndefinedPixelTrait)
           continue;
-        if ((traits & UpdatePixelTrait) == 0)
-          continue;
-        if (channel_statistics[channel].depth != MAGICKCORE_QUANTUM_DEPTH)
+        cs=channel_statistics+channel;
+        if (cs->depth != MAGICKCORE_QUANTUM_DEPTH)
           {
-            depth=channel_statistics[channel].depth;
+            depth=cs->depth;
             range=GetQuantumRange(depth);
-            status=p[i] != ScaleAnyToQuantum(ScaleQuantumToAny(p[i],range),
-              range) ? MagickTrue : MagickFalse;
+            status=p[i] != ScaleAnyToQuantum(ScaleQuantumToAny(p[i],range),range) ?
+              MagickTrue : MagickFalse;
             if (status != MagickFalse)
               {
-                channel_statistics[channel].depth++;
-                if (channel_statistics[channel].depth >
-                    channel_statistics[CompositePixelChannel].depth)
-                  channel_statistics[CompositePixelChannel].depth=
-                    channel_statistics[channel].depth;
+                cs->depth++;
+                if (cs->depth > channel_statistics[CompositePixelChannel].depth)
+                  channel_statistics[CompositePixelChannel].depth=cs->depth;
                 i--;
                 continue;
               }
           }
-        if ((double) p[i] < channel_statistics[channel].minima)
-          channel_statistics[channel].minima=(double) p[i];
-        if ((double) p[i] > channel_statistics[channel].maxima)
-          channel_statistics[channel].maxima=(double) p[i];
-        channel_statistics[channel].sum+=p[i];
-        channel_statistics[channel].sum_squared+=(double) p[i]*p[i];
-        channel_statistics[channel].sum_cubed+=(double) p[i]*p[i]*p[i];
-        channel_statistics[channel].sum_fourth_power+=(double) p[i]*p[i]*p[i]*
-          p[i];
-        channel_statistics[channel].area++;
-        if ((double) p[i] < channel_statistics[CompositePixelChannel].minima)
-          channel_statistics[CompositePixelChannel].minima=(double) p[i];
-        if ((double) p[i] > channel_statistics[CompositePixelChannel].maxima)
-          channel_statistics[CompositePixelChannel].maxima=(double) p[i];
-        histogram[GetPixelChannels(image)*ScaleQuantumToMap(
+        cs->area++;
+        if ((double) p[i] < cs->minima)
+          cs->minima=(double) p[i];
+        if ((double) p[i] > cs->maxima)
+          cs->maxima=(double) p[i];
+        histogram[(ssize_t) GetPixelChannels(image)*ScaleQuantumToMap(
           ClampToQuantum((double) p[i]))+i]++;
-        channel_statistics[CompositePixelChannel].sum+=(double) p[i];
-        channel_statistics[CompositePixelChannel].sum_squared+=(double)
-          p[i]*p[i];
-        channel_statistics[CompositePixelChannel].sum_cubed+=(double)
-          p[i]*p[i]*p[i];
-        channel_statistics[CompositePixelChannel].sum_fourth_power+=(double)
-          p[i]*p[i]*p[i]*p[i];
-        channel_statistics[CompositePixelChannel].area++;
+        cs->sumLD+=(long double) p[i];
+        /*
+          sum_squared, sum_cubed and sum_fourth_power are not used in
+          MagickCore or MagickWand, but are made available in
+          Magick++/lib/Statistic.cpp, so we need to calculate these.
+        */
+        cs->sum_squared+=(double) p[i]*(double) p[i];
+        cs->sum_cubed+=(double) p[i]*(double) p[i]*(double) p[i];
+        cs->sum_fourth_power+=(double) p[i]*(double) p[i]*(double) p[i]*
+          (double) p[i];
+        {
+          /* Calculate running totals for Welford's method.
+          */
+          double
+            n = cs->area,
+            n1 = cs->area-1;
+
+          long double
+            delta,
+            delta_n,
+            delta_n2,
+            term1;
+
+          delta=(double) p[i]-cs->M1;
+          delta_n=delta/n;
+          delta_n2=delta_n*delta_n;
+          term1=delta*delta_n*n1;
+          cs->M4+=term1*delta_n2*(n*n-3.0*n+3.0)+6.0*delta_n2*cs->M2-4.0*
+            delta_n*cs->M3;
+          cs->M3+=term1*delta_n*(n-2.0)-3.0*delta_n*cs->M2;
+          cs->M2+=term1;
+          cs->M1+=delta_n;
+        }
       }
-      p+=GetPixelChannels(image);
+      p+=(ptrdiff_t) GetPixelChannels(image);
     }
   }
-  for (i=0; i <= (ssize_t) MaxPixelChannels; i++)
+  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
   {
-    /*
-      Normalize pixel statistics.
-    */
-    area=PerceptibleReciprocal(channel_statistics[i].area);
-    channel_statistics[i].sum*=area;
-    channel_statistics[i].sum_squared*=area;
-    channel_statistics[i].sum_cubed*=area;
-    channel_statistics[i].sum_fourth_power*=area;
-    channel_statistics[i].mean=channel_statistics[i].sum;
-    channel_statistics[i].variance=channel_statistics[i].sum_squared;
-    standard_deviation=sqrt(channel_statistics[i].variance-
-      (channel_statistics[i].mean*channel_statistics[i].mean));
-    standard_deviation=sqrt(PerceptibleReciprocal(channel_statistics[i].area-
-      1.0)*channel_statistics[i].area*standard_deviation*standard_deviation);
-    channel_statistics[i].standard_deviation=standard_deviation;
+    ChannelStatistics
+      *cs;
+
+    PixelChannel channel = GetPixelChannelChannel(image,i);
+    PixelTrait traits = GetPixelChannelTraits(image,channel);
+    double AdjArea = 1.0;
+    if (traits == UndefinedPixelTrait)
+      continue;
+    cs=channel_statistics+channel;
+    cs->mean=0.0;
+    if (cs->area > 0)
+      {
+        cs->mean=(double) (cs->sumLD/(long double) cs->area);
+        if (cs->area > 1.0)
+          AdjArea=cs->area/(cs->area-1.0);
+      }
+    cs->sum=(double) cs->sum;
+    if (cs->M2 == 0.0)
+      {
+        cs->standard_deviation=0.0;
+        cs->variance=0.0;
+        cs->skewness=0.0;
+        cs->kurtosis=0.0;
+      }
+    else
+      {
+        if (cs->area > 1.0)
+          cs->standard_deviation=(double) sqrtl(cs->M2/((long double) cs->area-1.0));
+        else
+          cs->standard_deviation=(double) sqrtl(cs->M2/((long double) cs->area));
+        cs->variance=cs->standard_deviation*cs->standard_deviation;
+        cs->skewness=(double) (sqrtl(cs->area)*cs->M3/powl(cs->M2*AdjArea,1.5));
+        cs->kurtosis=(double) (cs->area*cs->M4/(cs->M2*cs->M2*AdjArea*AdjArea)-3.0);
+      }
   }
+
   for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
   {
     double
@@ -2185,49 +2233,38 @@ MagickExport ChannelStatistics *GetImageStatistics(const Image *image,
     ssize_t
       j;
 
+    PixelChannel channel = GetPixelChannelChannel(image,i);
+    ChannelStatistics *cs = channel_statistics+channel;
+    if (cs->area > 0.0)
+      {
+        cs->sum/=cs->area;
+        cs->sum_squared/=cs->area;
+        cs->sum_cubed/=cs->area;
+        cs->sum_fourth_power/=cs->area;
+      }
     /*
       Compute pixel entropy.
     */
-    PixelChannel channel = GetPixelChannelChannel(image,i);
     number_bins=0.0;
     for (j=0; j <= (ssize_t) MaxMap; j++)
-      if (histogram[GetPixelChannels(image)*j+i] > 0.0)
+      if (histogram[(ssize_t) GetPixelChannels(image)*j+i] > 0.0)
         number_bins++;
-    area=PerceptibleReciprocal(channel_statistics[channel].area);
+    area=PerceptibleReciprocalLD(channel_statistics[channel].area);
     for (j=0; j <= (ssize_t) MaxMap; j++)
     {
       double
         count;
 
-      count=area*histogram[GetPixelChannels(image)*j+i];
-      channel_statistics[channel].entropy+=-count*MagickLog10(count)*
-        PerceptibleReciprocal(MagickLog10(number_bins));
-      channel_statistics[CompositePixelChannel].entropy+=-count*
-        MagickLog10(count)*PerceptibleReciprocal(MagickLog10(number_bins))/
-        GetPixelChannels(image);
+      count=(double) (area*histogram[(ssize_t) GetPixelChannels(image)*j+i]);
+      channel_statistics[channel].entropy+=((long double) -count*
+        MagickLog10(count)*PerceptibleReciprocalLD((long double)
+        MagickLog10(number_bins)));
+      channel_statistics[CompositePixelChannel].entropy+=((long double) -count*
+        MagickLog10(count)*PerceptibleReciprocalLD((long double)
+        MagickLog10(number_bins))/GetPixelChannels(image));
     }
   }
   histogram=(double *) RelinquishMagickMemory(histogram);
-  for (i=0; i <= (ssize_t) MaxPixelChannels; i++)
-  {
-    /*
-      Compute kurtosis & skewness statistics.
-    */
-    standard_deviation=PerceptibleReciprocal(
-      channel_statistics[i].standard_deviation);
-    channel_statistics[i].skewness=(channel_statistics[i].sum_cubed-3.0*
-      channel_statistics[i].mean*channel_statistics[i].sum_squared+2.0*
-      channel_statistics[i].mean*channel_statistics[i].mean*
-      channel_statistics[i].mean)*(standard_deviation*standard_deviation*
-      standard_deviation);
-    channel_statistics[i].kurtosis=(channel_statistics[i].sum_fourth_power-4.0*
-      channel_statistics[i].mean*channel_statistics[i].sum_cubed+6.0*
-      channel_statistics[i].mean*channel_statistics[i].mean*
-      channel_statistics[i].sum_squared-3.0*channel_statistics[i].mean*
-      channel_statistics[i].mean*1.0*channel_statistics[i].mean*
-      channel_statistics[i].mean)*(standard_deviation*standard_deviation*
-      standard_deviation*standard_deviation)-3.0;
-  }
   median_info=AcquireVirtualMemory(image->columns,image->rows*sizeof(*median));
   if (median_info == (MemoryInfo *) NULL)
     (void) ThrowMagickException(exception,GetMagickModule(),
@@ -2264,11 +2301,11 @@ MagickExport ChannelStatistics *GetImageStatistics(const Image *image,
           {
             if (GetPixelReadMask(image,p) <= (QuantumRange/2))
               {
-                p+=GetPixelChannels(image);
+                p+=(ptrdiff_t) GetPixelChannels(image);
                 continue;
               }
             median[n++]=p[i];
-            p+=GetPixelChannels(image);
+            p+=(ptrdiff_t) GetPixelChannels(image);
           }
         }
         channel_statistics[channel].median=(double) median[
@@ -2276,26 +2313,65 @@ MagickExport ChannelStatistics *GetImageStatistics(const Image *image,
       }
       median_info=RelinquishVirtualMemory(median_info);
     }
-  channel_statistics[CompositePixelChannel].mean=0.0;
-  channel_statistics[CompositePixelChannel].median=0.0;
-  channel_statistics[CompositePixelChannel].standard_deviation=0.0;
-  channel_statistics[CompositePixelChannel].entropy=0.0;
-  for (i=0; i < (ssize_t) MaxPixelChannels; i++)
   {
-    channel_statistics[CompositePixelChannel].mean+=
-      channel_statistics[i].mean;
-    channel_statistics[CompositePixelChannel].median+=
-      channel_statistics[i].median;
-    channel_statistics[CompositePixelChannel].standard_deviation+=
-      channel_statistics[i].standard_deviation;
-    channel_statistics[CompositePixelChannel].entropy+=
-      channel_statistics[i].entropy;
+    ChannelStatistics *csComp = channel_statistics+CompositePixelChannel;
+    csComp->sum=0.0;
+    csComp->sum_squared=0.0;
+    csComp->sum_cubed=0.0;
+    csComp->sum_fourth_power=0.0;
+    csComp->maxima=(-MagickMaximumValue);
+    csComp->minima=MagickMaximumValue;
+    csComp->area=0.0;
+    csComp->mean=0.0;
+    csComp->median=0.0;
+    csComp->variance=0.0;
+    csComp->standard_deviation=0.0;
+    csComp->entropy=0.0;
+    csComp->skewness=0.0;
+    csComp->kurtosis=0.0;
+    for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+    {
+      ChannelStatistics
+        *cs;
+
+      PixelChannel channel = GetPixelChannelChannel(image,i);
+      PixelTrait traits = GetPixelChannelTraits(image,channel);
+      if (traits == UndefinedPixelTrait)
+        continue;
+      if ((traits & UpdatePixelTrait) == 0)
+        continue;
+      cs=channel_statistics+channel;
+      if (csComp->maxima < cs->maxima)
+        csComp->maxima=cs->maxima;
+      if (csComp->minima > cs->minima)
+        csComp->minima=cs->minima;
+      csComp->sum+=cs->sum;
+      csComp->sum_squared+=cs->sum_squared;
+      csComp->sum_cubed+=cs->sum_cubed;
+      csComp->sum_fourth_power+=cs->sum_fourth_power;
+      csComp->median+=cs->median;
+      csComp->area+=cs->area;
+      csComp->mean+=cs->mean;
+      csComp->variance+=cs->variance;
+      csComp->standard_deviation+=cs->standard_deviation;
+      csComp->skewness+=cs->skewness;
+      csComp->kurtosis+=cs->kurtosis;
+      csComp->entropy+=cs->entropy;
+    }
+    channels=(double) GetImageChannels(image);
+    csComp->sum/=channels;
+    csComp->sum_squared/=channels;
+    csComp->sum_cubed/=channels;
+    csComp->sum_fourth_power/=channels;
+    csComp->median/=channels;
+    csComp->area/=channels;
+    csComp->mean/=channels;
+    csComp->variance/=channels;
+    csComp->standard_deviation/=channels;
+    csComp->skewness/=channels;
+    csComp->kurtosis/=channels;
+    csComp->entropy/=channels;
   }
-  channels=(double) GetImageChannels(image);
-  channel_statistics[CompositePixelChannel].mean/=channels;
-  channel_statistics[CompositePixelChannel].median/=channels;
-  channel_statistics[CompositePixelChannel].standard_deviation/=channels;
-  channel_statistics[CompositePixelChannel].entropy/=channels;
   if (y < (ssize_t) image->rows)
     channel_statistics=(ChannelStatistics *) RelinquishMagickMemory(
       channel_statistics);
@@ -2463,9 +2539,9 @@ MagickExport Image *PolynomialImage(const Image *images,
           coefficient=(MagickRealType) terms[2*j];
           degree=(MagickRealType) terms[(j << 1)+1];
           polynomial_pixel[x].channel[i]+=coefficient*
-            pow(QuantumScale*GetPixelChannel(image,channel,p),degree);
+            pow(QuantumScale*(double) GetPixelChannel(image,channel,p),degree);
         }
-        p+=GetPixelChannels(next);
+        p+=(ptrdiff_t) GetPixelChannels(next);
       }
       image_view=DestroyCacheView(image_view);
       next=GetNextImageInList(next);
@@ -2480,9 +2556,10 @@ MagickExport Image *PolynomialImage(const Image *images,
           continue;
         if ((traits & UpdatePixelTrait) == 0)
           continue;
-        q[i]=ClampToQuantum(QuantumRange*polynomial_pixel[x].channel[i]);
+        q[i]=ClampToQuantum((double) QuantumRange*
+          polynomial_pixel[x].channel[i]);
       }
-      q+=GetPixelChannels(image);
+      q+=(ptrdiff_t) GetPixelChannels(image);
     }
     if (SyncCacheViewAuthenticPixels(polynomial_view,exception) == MagickFalse)
       status=MagickFalse;
@@ -2664,6 +2741,7 @@ static void AddNodePixelList(PixelList *pixel_list,const size_t color)
     Determine where it belongs in the list.
   */
   search=65536UL;
+  (void) memset(update,0,sizeof(update));
   for (level=p->level; level >= 0; level--)
   {
     while (p->nodes[search].next[level] < color)
@@ -2721,7 +2799,7 @@ static inline void GetMedianPixelList(PixelList *pixel_list,Quantum *pixel)
   do
   {
     color=p->nodes[color].next[0];
-    count+=p->nodes[color].count;
+    count+=(ssize_t) p->nodes[color].count;
   } while (count <= (ssize_t) (pixel_list->length >> 1));
   *pixel=ScaleShortToQuantum((unsigned short) color);
 }
@@ -2755,7 +2833,7 @@ static inline void GetModePixelList(PixelList *pixel_list,Quantum *pixel)
         mode=color;
         max_count=p->nodes[mode].count;
       }
-    count+=p->nodes[color].count;
+    count+=(ssize_t) p->nodes[color].count;
   } while (count < (ssize_t) pixel_list->length);
   *pixel=ScaleShortToQuantum((unsigned short) mode);
 }
@@ -2785,7 +2863,7 @@ static inline void GetNonpeakPixelList(PixelList *pixel_list,Quantum *pixel)
     previous=color;
     color=next;
     next=p->nodes[color].next[0];
-    count+=p->nodes[color].count;
+    count+=(ssize_t) p->nodes[color].count;
   } while (count <= (ssize_t) (pixel_list->length >> 1));
   if ((previous == 65536UL) && (next != 65536UL))
     color=next;
@@ -2888,8 +2966,9 @@ MagickExport Image *StatisticImage(const Image *image,const StatisticType type,
   /*
     Make each pixel the min / max / median / mode / etc. of the neighborhood.
   */
-  center=(ssize_t) GetPixelChannels(image)*(image->columns+MagickMax(width,1))*
-    (MagickMax(height,1)/2L)+GetPixelChannels(image)*(MagickMax(width,1)/2L);
+  center=(ssize_t) GetPixelChannels(image)*((ssize_t) image->columns+
+    MagickMax((ssize_t) width,1L))*(MagickMax((ssize_t) height,1)/2L)+(ssize_t)
+    GetPixelChannels(image)*(MagickMax((ssize_t) width,1L)/2L);
   status=MagickTrue;
   progress=0;
   image_view=AcquireVirtualCacheView(image,exception);
@@ -2979,19 +3058,19 @@ MagickExport Image *StatisticImage(const Image *image,const StatisticType type,
                 (type == NonpeakStatistic))
               {
                 InsertPixelList(pixels[i],pixel_list[id]);
-                pixels+=GetPixelChannels(image);
+                pixels+=(ptrdiff_t) GetPixelChannels(image);
                 continue;
               }
             area++;
-            if (pixels[i] < minimum)
+            if ((double) pixels[i] < minimum)
               minimum=(double) pixels[i];
-            if (pixels[i] > maximum)
+            if ((double) pixels[i] > maximum)
               maximum=(double) pixels[i];
             sum+=(double) pixels[i];
-            sum_squared+=(double) pixels[i]*pixels[i];
-            pixels+=GetPixelChannels(image);
+            sum_squared+=(double) pixels[i]*(double) pixels[i];
+            pixels+=(ptrdiff_t) GetPixelChannels(image);
           }
-          pixels+=GetPixelChannels(image)*image->columns;
+          pixels+=(ptrdiff_t) GetPixelChannels(image)*image->columns;
         }
         switch (type)
         {
@@ -3050,8 +3129,8 @@ MagickExport Image *StatisticImage(const Image *image,const StatisticType type,
         }
         SetPixelChannel(statistic_image,channel,pixel,q);
       }
-      p+=GetPixelChannels(image);
-      q+=GetPixelChannels(statistic_image);
+      p+=(ptrdiff_t) GetPixelChannels(image);
+      q+=(ptrdiff_t) GetPixelChannels(statistic_image);
     }
     if (SyncCacheViewAuthenticPixels(statistic_view,exception) == MagickFalse)
       status=MagickFalse;

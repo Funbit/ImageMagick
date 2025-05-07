@@ -83,7 +83,7 @@
 #include "coders/ghostscript-private.h"
 
 /*
-  Typedef declaractions.
+  Typedef declarations.
 */
 typedef struct _PSInfo
 {
@@ -302,7 +302,7 @@ static void ReadPSInfo(const ImageInfo *image_info,Image *image,PSInfo *ps_info,
     {
       case '<':
       {
-        ReadGhostScriptXMPProfile(&buffer,&ps_info->xmp_profile);
+        ReadGhostScriptXMPProfile(&buffer,&ps_info->xmp_profile,exception);
         continue;
       }
       case '\n':
@@ -439,18 +439,22 @@ static void ReadPSInfo(const ImageInfo *image_info,Image *image,PSInfo *ps_info,
         */
         if (SkipMagickByteBufferUntilNewline(&buffer) != MagickFalse)
           {
-            ps_info->icc_profile=AcquireStringInfo(MagickPathExtent);
-            datum=GetStringInfoDatum(ps_info->icc_profile);
-            for (i=0; (c=ProfileInteger(&buffer,hex_digits)) != EOF; i++)
-            {
-              if (i >= (ssize_t) GetStringInfoLength(ps_info->icc_profile))
+            ps_info->icc_profile=AcquireProfileStringInfo("icc",MagickPathExtent,
+              exception);
+            if (ps_info->icc_profile != (StringInfo*) NULL)
+              {
+                datum=GetStringInfoDatum(ps_info->icc_profile);
+                for (i=0; (c=ProfileInteger(&buffer,hex_digits)) != EOF; i++)
                 {
-                  SetStringInfoLength(ps_info->icc_profile,(size_t) i << 1);
-                  datum=GetStringInfoDatum(ps_info->icc_profile);
+                  if (i >= (ssize_t) GetStringInfoLength(ps_info->icc_profile))
+                    {
+                      SetStringInfoLength(ps_info->icc_profile,(size_t) i << 1);
+                      datum=GetStringInfoDatum(ps_info->icc_profile);
+                    }
+                  datum[i]=(unsigned char) c;
                 }
-              datum[i]=(unsigned char) c;
-            }
-            SetStringInfoLength(ps_info->icc_profile,(size_t) i+1);
+                SetStringInfoLength(ps_info->icc_profile,(size_t) i+1);
+              }
           }
         continue;
       }
@@ -476,17 +480,21 @@ static void ReadPSInfo(const ImageInfo *image_info,Image *image,PSInfo *ps_info,
         length=(size_t) extent;
         if (SkipMagickByteBufferUntilNewline(&buffer) != MagickFalse)
           {
-            ps_info->photoshop_profile=AcquireStringInfo(length+1U);
-            q=GetStringInfoDatum(ps_info->photoshop_profile);
-            while (extent > 0)
-            {
-              c=ProfileInteger(&buffer,hex_digits);
-              if (c == EOF)
-                break;
-              *q++=(unsigned char) c;
-              extent-=MagickMin(extent,1);
-            }
-            SetStringInfoLength(ps_info->photoshop_profile,length);
+            ps_info->photoshop_profile=AcquireProfileStringInfo("8bim",
+              length+1U,exception);
+            if (ps_info->icc_profile != (StringInfo*) NULL)
+              {
+                q=GetStringInfoDatum(ps_info->photoshop_profile);
+                while (extent > 0)
+                {
+                  c=ProfileInteger(&buffer,hex_digits);
+                  if (c == EOF)
+                    break;
+                  *q++=(unsigned char) c;
+                  extent-=MagickMin(extent,1);
+                }
+                SetStringInfoLength(ps_info->photoshop_profile,length);
+              }
           }
         continue;
       }
@@ -876,12 +884,11 @@ static Image *ReadPSImage(const ImageInfo *image_info,ExceptionInfo *exception)
         }
     }
   if (info.icc_profile != (StringInfo *) NULL)
-    (void) SetImageProfile(image,"icc",info.icc_profile,exception);
+    (void) SetImageProfilePrivate(image,info.icc_profile,exception);
   if (info.photoshop_profile != (StringInfo *) NULL)
-    (void) SetImageProfile(image,"8bim",info.photoshop_profile,exception);
+    (void) SetImageProfilePrivate(image,info.photoshop_profile,exception);
   if (info.xmp_profile != (StringInfo *) NULL)
-    (void) SetImageProfile(image,"xmp",info.xmp_profile,exception);
-  CleanupPSInfo(&info);
+    (void) SetImageProfilePrivate(image,info.xmp_profile,exception);
   if (image_info->number_scenes != 0)
     {
       Image
@@ -1425,16 +1432,13 @@ static MagickBooleanType WritePSImage(const ImageInfo *image_info,Image *image,
     media_info,
     page_info;
 
-  unsigned char
-    *q;
-
   SegmentInfo
     bounds;
 
   size_t
     bit,
     byte,
-    imageListLength,
+    number_scenes,
     length,
     page,
     text_size;
@@ -1449,7 +1453,9 @@ static MagickBooleanType WritePSImage(const ImageInfo *image_info,Image *image,
     timer;
 
   unsigned char
-    pixels[2048];
+    pixels[2048],
+    *q;
+
 
   /*
     Open output image file.
@@ -1471,7 +1477,7 @@ static MagickBooleanType WritePSImage(const ImageInfo *image_info,Image *image,
     compression=image_info->compression;
   page=1;
   scene=0;
-  imageListLength=GetImageListLength(image);
+  number_scenes=GetImageListLength(image);
   do
   {
     ImageType
@@ -1528,15 +1534,16 @@ static MagickBooleanType WritePSImage(const ImageInfo *image_info,Image *image,
     (void) ParseMetaGeometry(page_geometry,&geometry.x,&geometry.y,
       &geometry.width,&geometry.height);
     scale.x=PerceptibleReciprocal(resolution.x)*geometry.width*delta.x;
-    geometry.width=(size_t) floor(scale.x+0.5);
+    geometry.width=CastDoubleToUnsigned(scale.x+0.5);
     scale.y=PerceptibleReciprocal(resolution.y)*geometry.height*delta.y;
-    geometry.height=(size_t) floor(scale.y+0.5);
+    geometry.height=CastDoubleToUnsigned(scale.y+0.5);
     (void) ParseAbsoluteGeometry(page_geometry,&media_info);
     (void) ParseGravityGeometry(image,page_geometry,&page_info,exception);
     if (image->gravity != UndefinedGravity)
       {
         geometry.x=(-page_info.x);
-        geometry.y=(ssize_t) (media_info.height+page_info.y-image->rows);
+        geometry.y=(ssize_t) media_info.height+page_info.y-(ssize_t)
+          image->rows;
       }
     pointsize=12.0;
     if (image_info->pointsize != 0.0)
@@ -1568,7 +1575,7 @@ static MagickBooleanType WritePSImage(const ImageInfo *image_info,Image *image,
         bounds.x1=(double) geometry.x;
         bounds.y1=(double) geometry.y;
         bounds.x2=(double) geometry.x+scale.x;
-        bounds.y2=(double) geometry.y+(geometry.height+text_size);
+        bounds.y2=(double) geometry.y+(scale.y+text_size);
         if ((image_info->adjoin != MagickFalse) &&
             (GetNextImageInList(image) != (Image *) NULL))
           (void) CopyMagickString(buffer,"%%%%BoundingBox: (atend)\n",
@@ -1621,7 +1628,7 @@ static MagickBooleanType WritePSImage(const ImageInfo *image_info,Image *image,
             (void) WriteBlobString(image,"%%PageOrder: Ascend\n");
             (void) FormatLocaleString(buffer,MagickPathExtent,
               "%%%%Pages: %.20g\n",image_info->adjoin != MagickFalse ?
-              (double) imageListLength : 1.0);
+              (double) number_scenes : 1.0);
             (void) WriteBlobString(image,buffer);
           }
         (void) WriteBlobString(image,"%%EndComments\n");
@@ -1674,7 +1681,7 @@ static MagickBooleanType WritePSImage(const ImageInfo *image_info,Image *image,
                     if ((q-pixels+8) >= 80)
                       {
                         *q++='\n';
-                        (void) WriteBlob(image,q-pixels,pixels);
+                        (void) WriteBlob(image,(size_t) (q-pixels),pixels);
                         q=pixels;
                         (void) WriteBlobString(image,"%  ");
                       };
@@ -1689,7 +1696,7 @@ static MagickBooleanType WritePSImage(const ImageInfo *image_info,Image *image,
                   if ((q-pixels+8) >= 80)
                     {
                       *q++='\n';
-                      (void) WriteBlob(image,q-pixels,pixels);
+                      (void) WriteBlob(image,(size_t) (q-pixels),pixels);
                       q=pixels;
                       (void) WriteBlobString(image,"%  ");
                     };
@@ -1698,7 +1705,7 @@ static MagickBooleanType WritePSImage(const ImageInfo *image_info,Image *image,
             if (q != pixels)
               {
                 *q++='\n';
-                (void) WriteBlob(image,q-pixels,pixels);
+                (void) WriteBlob(image,(size_t) (q-pixels),pixels);
               }
             (void) WriteBlobString(image,"\n%%EndPreview\n");
             preview_image=DestroyImage(preview_image);
@@ -1742,9 +1749,9 @@ static MagickBooleanType WritePSImage(const ImageInfo *image_info,Image *image,
       bounds.x1=(double) geometry.x;
     if ((double) geometry.y < bounds.y1)
       bounds.y1=(double) geometry.y;
-    if ((double) (geometry.x+geometry.width-1) > bounds.x2)
+    if ((double) (geometry.x+(ssize_t) geometry.width-1) > bounds.x2)
       bounds.x2=(double) geometry.x+geometry.width-1;
-    if ((double) (geometry.y+(geometry.height+text_size)-1) > bounds.y2)
+    if ((double) (geometry.y+((ssize_t) geometry.height+(ssize_t) text_size)-1) > bounds.y2)
       bounds.y2=(double) geometry.y+(geometry.height+text_size)-1;
     value=GetImageProperty(image,"label",exception);
     if (value != (const char *) NULL)
@@ -1808,10 +1815,10 @@ static MagickBooleanType WritePSImage(const ImageInfo *image_info,Image *image,
                 if ((q-pixels+8) >= 80)
                   {
                     *q++='\n';
-                    (void) WriteBlob(image,q-pixels,pixels);
+                    (void) WriteBlob(image,(size_t) (q-pixels),pixels);
                     q=pixels;
                   }
-                p+=GetPixelChannels(image);
+                p+=(ptrdiff_t) GetPixelChannels(image);
               }
               if (image->previous == (Image *) NULL)
                 {
@@ -1824,7 +1831,7 @@ static MagickBooleanType WritePSImage(const ImageInfo *image_info,Image *image,
             if (q != pixels)
               {
                 *q++='\n';
-                (void) WriteBlob(image,q-pixels,pixels);
+                (void) WriteBlob(image,(size_t) (q-pixels),pixels);
               }
           }
         else
@@ -1860,13 +1867,13 @@ static MagickBooleanType WritePSImage(const ImageInfo *image_info,Image *image,
                     if ((q-pixels+2) >= 80)
                       {
                         *q++='\n';
-                        (void) WriteBlob(image,q-pixels,pixels);
+                        (void) WriteBlob(image,(size_t) (q-pixels),pixels);
                         q=pixels;
                       };
                     bit=0;
                     byte=0;
                   }
-                p+=GetPixelChannels(image);
+                p+=(ptrdiff_t) GetPixelChannels(image);
               }
               if (bit != 0)
                 {
@@ -1875,7 +1882,7 @@ static MagickBooleanType WritePSImage(const ImageInfo *image_info,Image *image,
                   if ((q-pixels+2) >= 80)
                     {
                       *q++='\n';
-                      (void) WriteBlob(image,q-pixels,pixels);
+                      (void) WriteBlob(image,(size_t) (q-pixels),pixels);
                       q=pixels;
                     }
                 };
@@ -1890,7 +1897,7 @@ static MagickBooleanType WritePSImage(const ImageInfo *image_info,Image *image,
             if (q != pixels)
               {
                 *q++='\n';
-                (void) WriteBlob(image,q-pixels,pixels);
+                (void) WriteBlob(image,(size_t) (q-pixels),pixels);
               }
           }
       }
@@ -1936,20 +1943,20 @@ static MagickBooleanType WritePSImage(const ImageInfo *image_info,Image *image,
                           if ((q-pixels+10) >= 80)
                             {
                               *q++='\n';
-                              (void) WriteBlob(image,q-pixels,pixels);
+                              (void) WriteBlob(image,(size_t) (q-pixels),pixels);
                               q=pixels;
                             }
                         }
                       length=0;
                     }
                   GetPixelInfoPixel(image,p,&pixel);
-                  p+=GetPixelChannels(image);
+                  p+=(ptrdiff_t) GetPixelChannels(image);
                 }
                 WriteRunlengthPacket(image,pixel,length,p);
                 if ((q-pixels+10) >= 80)
                   {
                     *q++='\n';
-                    (void) WriteBlob(image,q-pixels,pixels);
+                    (void) WriteBlob(image,(size_t) (q-pixels),pixels);
                     q=pixels;
                   }
                 if (image->previous == (Image *) NULL)
@@ -1963,7 +1970,7 @@ static MagickBooleanType WritePSImage(const ImageInfo *image_info,Image *image,
               if (q != pixels)
                 {
                   *q++='\n';
-                  (void) WriteBlob(image,q-pixels,pixels);
+                  (void) WriteBlob(image,(size_t) (q-pixels),pixels);
                 }
               break;
             }
@@ -2000,10 +2007,10 @@ static MagickBooleanType WritePSImage(const ImageInfo *image_info,Image *image,
                   if ((q-pixels+6) >= 80)
                     {
                       *q++='\n';
-                      (void) WriteBlob(image,q-pixels,pixels);
+                      (void) WriteBlob(image,(size_t) (q-pixels),pixels);
                       q=pixels;
                     }
-                  p+=GetPixelChannels(image);
+                  p+=(ptrdiff_t) GetPixelChannels(image);
                 }
                 if (image->previous == (Image *) NULL)
                   {
@@ -2016,7 +2023,7 @@ static MagickBooleanType WritePSImage(const ImageInfo *image_info,Image *image,
               if (q != pixels)
                 {
                   *q++='\n';
-                  (void) WriteBlob(image,q-pixels,pixels);
+                  (void) WriteBlob(image,(size_t) (q-pixels),pixels);
                 }
               break;
             }
@@ -2078,7 +2085,7 @@ static MagickBooleanType WritePSImage(const ImageInfo *image_info,Image *image,
                           if ((q-pixels+6) >= 80)
                             {
                               *q++='\n';
-                              (void) WriteBlob(image,q-pixels,pixels);
+                              (void) WriteBlob(image,(size_t) (q-pixels),pixels);
                               q=pixels;
                             }
                         }
@@ -2089,14 +2096,14 @@ static MagickBooleanType WritePSImage(const ImageInfo *image_info,Image *image,
                   pixel.green=(MagickRealType) GetPixelGreen(image,p);
                   pixel.blue=(MagickRealType) GetPixelBlue(image,p);
                   pixel.alpha=(MagickRealType) GetPixelAlpha(image,p);
-                  p+=GetPixelChannels(image);
+                  p+=(ptrdiff_t) GetPixelChannels(image);
                 }
                 q=PopHexPixel(hex_digits,(size_t) index,q);
                 q=PopHexPixel(hex_digits,(size_t) MagickMin(length,0xff),q);
                 if ((q-pixels+6) >= 80)
                   {
                     *q++='\n';
-                    (void) WriteBlob(image,q-pixels,pixels);
+                    (void) WriteBlob(image,(size_t) (q-pixels),pixels);
                     q=pixels;
                   }
                 if (image->previous == (Image *) NULL)
@@ -2110,7 +2117,7 @@ static MagickBooleanType WritePSImage(const ImageInfo *image_info,Image *image,
               if (q != pixels)
                 {
                   *q++='\n';
-                  (void) WriteBlob(image,q-pixels,pixels);
+                  (void) WriteBlob(image,(size_t) (q-pixels),pixels);
                 }
               break;
             }
@@ -2132,10 +2139,10 @@ static MagickBooleanType WritePSImage(const ImageInfo *image_info,Image *image,
                   if ((q-pixels+4) >= 80)
                     {
                       *q++='\n';
-                      (void) WriteBlob(image,q-pixels,pixels);
+                      (void) WriteBlob(image,(size_t) (q-pixels),pixels);
                       q=pixels;
                     }
-                  p+=GetPixelChannels(image);
+                  p+=(ptrdiff_t) GetPixelChannels(image);
                 }
                 if (image->previous == (Image *) NULL)
                   {
@@ -2148,7 +2155,7 @@ static MagickBooleanType WritePSImage(const ImageInfo *image_info,Image *image,
               if (q != pixels)
                 {
                   *q++='\n';
-                  (void) WriteBlob(image,q-pixels,pixels);
+                  (void) WriteBlob(image,(size_t) (q-pixels),pixels);
                 }
               break;
             }
@@ -2161,7 +2168,7 @@ static MagickBooleanType WritePSImage(const ImageInfo *image_info,Image *image,
     if (GetNextImageInList(image) == (Image *) NULL)
       break;
     image=SyncNextImageInList(image);
-    status=SetImageProgress(image,SaveImagesTag,scene++,imageListLength);
+    status=SetImageProgress(image,SaveImagesTag,scene++,number_scenes);
     if (status == MagickFalse)
       break;
   } while (image_info->adjoin != MagickFalse);
@@ -2178,6 +2185,7 @@ static MagickBooleanType WritePSImage(const ImageInfo *image_info,Image *image,
       (void) WriteBlobString(image,buffer);
     }
   (void) WriteBlobString(image,"%%EOF\n");
-  (void) CloseBlob(image);
-  return(MagickTrue);
+  if (CloseBlob(image) == MagickFalse)
+    status=MagickFalse;
+  return(status);
 }

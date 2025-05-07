@@ -106,12 +106,6 @@ static Image *ReadAVSImage(const ImageInfo *image_info,ExceptionInfo *exception)
   Quantum
     *q;
 
-  ssize_t
-    x;
-
-  unsigned char
-    *p;
-
   size_t
     height,
     length,
@@ -119,9 +113,11 @@ static Image *ReadAVSImage(const ImageInfo *image_info,ExceptionInfo *exception)
 
   ssize_t
     count,
+    x,
     y;
 
   unsigned char
+    *p,
     *pixels;
 
   /*
@@ -188,7 +184,7 @@ static Image *ReadAVSImage(const ImageInfo *image_info,ExceptionInfo *exception)
         SetPixelRed(image,ScaleCharToQuantum(*p++),q);
         SetPixelGreen(image,ScaleCharToQuantum(*p++),q);
         SetPixelBlue(image,ScaleCharToQuantum(*p++),q);
-        q+=GetPixelChannels(image);
+        q+=(ptrdiff_t) GetPixelChannels(image);
       }
       if (SyncAuthenticPixels(image,exception) == MagickFalse)
         break;
@@ -233,7 +229,8 @@ static Image *ReadAVSImage(const ImageInfo *image_info,ExceptionInfo *exception)
           break;
       }
   } while ((width != 0UL) && (height != 0UL));
-  (void) CloseBlob(image);
+  if (CloseBlob(image) == MagickFalse)
+    status=MagickFalse;
   if (status == MagickFalse)
     return(DestroyImageList(image));
   return(GetFirstImageInList(image));
@@ -327,6 +324,9 @@ ModuleExport void UnregisterAVSImage(void)
 static MagickBooleanType WriteAVSImage(const ImageInfo *image_info,Image *image,
   ExceptionInfo *exception)
 {
+  const Quantum
+    *magick_restrict p;
+
   MagickBooleanType
     status;
 
@@ -336,24 +336,17 @@ static MagickBooleanType WriteAVSImage(const ImageInfo *image_info,Image *image,
   MemoryInfo
     *pixel_info;
 
-  const Quantum
-    *magick_restrict p;
-
-  ssize_t
-    x;
-
-  unsigned char
-    *magick_restrict q;
-
   size_t
-    imageListLength;
+    number_scenes;
 
   ssize_t
     count,
+    x,
     y;
 
   unsigned char
-    *pixels;
+    *pixels,
+    *magick_restrict q;
 
   /*
     Open output image file.
@@ -370,7 +363,7 @@ static MagickBooleanType WriteAVSImage(const ImageInfo *image_info,Image *image,
   if (status == MagickFalse)
     return(status);
   scene=0;
-  imageListLength=GetImageListLength(image);
+  number_scenes=GetImageListLength(image);
   do
   {
     /*
@@ -403,7 +396,7 @@ static MagickBooleanType WriteAVSImage(const ImageInfo *image_info,Image *image,
         *q++=ScaleQuantumToChar(GetPixelRed(image,p));
         *q++=ScaleQuantumToChar(GetPixelGreen(image,p));
         *q++=ScaleQuantumToChar(GetPixelBlue(image,p));
-        p+=GetPixelChannels(image);
+        p+=(ptrdiff_t) GetPixelChannels(image);
       }
       count=WriteBlob(image,(size_t) (q-pixels),pixels);
       if (count != (ssize_t) (q-pixels))
@@ -420,10 +413,11 @@ static MagickBooleanType WriteAVSImage(const ImageInfo *image_info,Image *image,
     if (GetNextImageInList(image) == (Image *) NULL)
       break;
     image=SyncNextImageInList(image);
-    status=SetImageProgress(image,SaveImagesTag,scene++,imageListLength);
+    status=SetImageProgress(image,SaveImagesTag,scene++,number_scenes);
     if (status == MagickFalse)
       break;
   } while (image_info->adjoin != MagickFalse);
-  (void) CloseBlob(image);
-  return(MagickTrue);
+  if (CloseBlob(image) == MagickFalse)
+    status=MagickFalse;
+  return(status);
 }

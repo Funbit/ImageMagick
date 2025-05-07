@@ -244,8 +244,8 @@ static Image *ReadRAWImage(const ImageInfo *image_info,ExceptionInfo *exception)
             SetPixelRed(image,GetPixelRed(canvas_image,p),q);
             SetPixelGreen(image,GetPixelGreen(canvas_image,p),q);
             SetPixelBlue(image,GetPixelBlue(canvas_image,p),q);
-            p+=GetPixelChannels(canvas_image);
-            q+=GetPixelChannels(image);
+            p+=(ptrdiff_t) GetPixelChannels(canvas_image);
+            q+=(ptrdiff_t) GetPixelChannels(image);
           }
           if (SyncAuthenticPixels(image,exception) == MagickFalse)
             break;
@@ -289,7 +289,8 @@ static Image *ReadRAWImage(const ImageInfo *image_info,ExceptionInfo *exception)
   } while (count == (ssize_t) length);
   quantum_info=DestroyQuantumInfo(quantum_info);
   canvas_image=DestroyImage(canvas_image);
-  (void) CloseBlob(image);
+  if (CloseBlob(image) == MagickFalse)
+    status=MagickFalse;
   if (status == MagickFalse)
     return(DestroyImageList(image));
   return(GetFirstImageInList(image));
@@ -450,6 +451,9 @@ ModuleExport void UnregisterRAWImage(void)
 static MagickBooleanType WriteRAWImage(const ImageInfo *image_info,Image *image,
   ExceptionInfo *exception)
 {
+  const Quantum
+    *p;
+
   MagickOffsetType
     scene;
 
@@ -462,12 +466,9 @@ static MagickBooleanType WriteRAWImage(const ImageInfo *image_info,Image *image,
   MagickBooleanType
     status;
 
-  const Quantum
-    *p;
-
   size_t
-    imageListLength,
-    length;
+    length,
+    number_scenes;
 
   ssize_t
     count,
@@ -567,7 +568,7 @@ static MagickBooleanType WriteRAWImage(const ImageInfo *image_info,Image *image,
     }
   }
   scene=0;
-  imageListLength=GetImageListLength(image);
+  number_scenes=GetImageListLength(image);
   do
   {
     /*
@@ -599,10 +600,11 @@ static MagickBooleanType WriteRAWImage(const ImageInfo *image_info,Image *image,
     if (GetNextImageInList(image) == (Image *) NULL)
       break;
     image=SyncNextImageInList(image);
-    status=SetImageProgress(image,SaveImagesTag,scene++,imageListLength);
+    status=SetImageProgress(image,SaveImagesTag,scene++,number_scenes);
     if (status == MagickFalse)
       break;
   } while (image_info->adjoin != MagickFalse);
-  (void) CloseBlob(image);
-  return(MagickTrue);
+  if (CloseBlob(image) == MagickFalse)
+    status=MagickFalse;
+  return(status);
 }

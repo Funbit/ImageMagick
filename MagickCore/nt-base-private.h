@@ -30,6 +30,48 @@ extern "C" {
 
 #if defined(MAGICKCORE_WINDOWS_SUPPORT)
 
+#if !defined(closedir)
+#  define closedir(directory)  NTCloseDirectory(directory)
+#endif
+#if !defined(MAGICKCORE_LTDL_DELEGATE)
+#if !defined(lt_dlclose)
+#  define lt_dlclose(handle)  NTCloseLibrary(handle)
+#endif
+#if !defined(lt_dlerror)
+#  define lt_dlerror()  NTGetLibraryError()
+#endif
+#if !defined(lt_dlopen)
+#  define lt_dlopen(filename)  NTOpenLibrary(filename)
+#endif
+#if !defined(lt_dlsym)
+#  define lt_dlsym(handle,name)  NTGetLibrarySymbol(handle,name)
+#endif
+#endif
+#if !defined(opendir)
+#  define opendir(directory)  NTOpenDirectory(directory)
+#endif
+#if !defined(read)
+#  define read(fd,buffer,count)  _read(fd,buffer,(unsigned int) count)
+#endif
+#if !defined(readdir)
+#  define readdir(directory)  NTReadDirectory(directory)
+#endif
+#if !defined(sysconf)
+#  define sysconf(name)  NTSystemConfiguration(name)
+#  define MAGICKCORE_HAVE_SYSCONF 1
+#endif
+#if !defined(write)
+#  define write(fd,buffer,count)  _write(fd,buffer,(unsigned int) count)
+#endif
+#if !defined(__MINGW32__)
+#  define fseek  _fseeki64
+#  define ftell  _ftelli64
+#  define lseek  _lseeki64
+#  define fstat  _fstat64
+#  define stat  _stat64
+#  define tell  _telli64
+#endif
+
 #if !defined(XS_VERSION)
 struct dirent
 {
@@ -83,7 +125,7 @@ static inline void *NTAcquireQuantumMemory(const size_t count,
 }
 
 extern MagickPrivate char
-  *NTGetLastError(void);
+  *NTGetEnvironmentValue(const char *);
 
 #if !defined(MAGICKCORE_LTDL_DELEGATE)
 extern MagickPrivate const char
@@ -99,8 +141,7 @@ extern MagickPrivate DIR
 
 extern MagickPrivate double
   NTElapsedTime(void),
-  NTErf(double),
-  NTUserTime(void);
+  NTErf(double);
 
 extern MagickPrivate int
 #if !defined(__MINGW32__)
@@ -108,11 +149,7 @@ extern MagickPrivate int
 #endif
   NTCloseDirectory(DIR *),
   NTCloseLibrary(void *),
-  NTControlHandler(void),
-  NTExitLibrary(void),
   NTTruncateFile(int,off_t),
-  NTInitializeLibrary(void),
-  NTSetSearchPath(const char *),
   NTUnmapMemory(void *,size_t),
   NTSystemCommand(const char *,char *);
 
@@ -127,7 +164,7 @@ extern MagickPrivate MagickBooleanType
   NTReportEvent(const char *,const MagickBooleanType);
 
 extern MagickExport MagickBooleanType
-  NTLongPathsEnabled();
+  NTLongPathsEnabled(void);
 
 extern MagickPrivate struct dirent
   *NTReadDirectory(DIR *);
@@ -139,7 +176,6 @@ extern MagickPrivate unsigned char
 extern MagickPrivate void
   *NTGetLibrarySymbol(void *,const char *),
   NTGhostscriptEXE(char *,int),
-  NTInitializeWinsock(MagickBooleanType),
   *NTMapMemory(char *,size_t,int,int,int,MagickOffsetType),
   *NTOpenLibrary(const char *),
   NTWindowsGenesis(void),

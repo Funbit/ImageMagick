@@ -201,7 +201,7 @@ static Image *ReadPIXImage(const ImageInfo *image_info,ExceptionInfo *exception)
         SetPixelGreen(image,green,q);
         SetPixelRed(image,red,q);
         length--;
-        q+=GetPixelChannels(image);
+        q+=(ptrdiff_t) GetPixelChannels(image);
       }
       if (x < (ssize_t) image->columns)
         break;
@@ -254,7 +254,8 @@ static Image *ReadPIXImage(const ImageInfo *image_info,ExceptionInfo *exception)
           break;
       }
   } while (status != MagickFalse);
-  (void) CloseBlob(image);
+  if (CloseBlob(image) == MagickFalse)
+    status=MagickFalse;
   if (status == MagickFalse)
     return(DestroyImageList(image));
   return(GetFirstImageInList(image));

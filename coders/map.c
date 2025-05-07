@@ -108,17 +108,8 @@ static Image *ReadMAPImage(const ImageInfo *image_info,ExceptionInfo *exception)
   Quantum
     index;
 
-  ssize_t
-    x;
-
   Quantum
     *q;
-
-  ssize_t
-    i;
-
-  unsigned char
-    *p;
 
   size_t
     depth,
@@ -127,10 +118,13 @@ static Image *ReadMAPImage(const ImageInfo *image_info,ExceptionInfo *exception)
 
   ssize_t
     count,
+    i,
+    x,
     y;
 
   unsigned char
     *colormap,
+    *p,
     *pixels;
 
   /*
@@ -146,6 +140,11 @@ static Image *ReadMAPImage(const ImageInfo *image_info,ExceptionInfo *exception)
   image=AcquireImage(image_info,exception);
   if ((image->columns == 0) || (image->rows == 0))
     ThrowReaderException(OptionError,"MustSpecifyImageSize");
+  if (image_info->depth == 0)
+    ThrowReaderException(OptionError,"MustSpecifyImageDepth");
+  status=SetImageExtent(image,image->columns,image->rows,exception);
+  if (status == MagickFalse)
+    return(DestroyImageList(image));
   status=OpenBlob(image_info,image,ReadBinaryBlobMode,exception);
   if (status == MagickFalse)
     {
@@ -195,13 +194,13 @@ static Image *ReadMAPImage(const ImageInfo *image_info,ExceptionInfo *exception)
   else
     for (i=0; i < (ssize_t) image->colors; i++)
     {
-      quantum=(*p++ << 8);
+      quantum=(size_t) (*p++ << 8);
       quantum|=(*p++);
       image->colormap[i].red=(Quantum) quantum;
-      quantum=(*p++ << 8);
-      quantum|=(*p++);
+      quantum=(size_t) (*p++ << 8);
+      quantum|=(size_t) (*p++);
       image->colormap[i].green=(Quantum) quantum;
-      quantum=(*p++ << 8);
+      quantum=(size_t) (*p++ << 8);
       quantum|=(*p++);
       image->colormap[i].blue=(Quantum) quantum;
     }
@@ -237,13 +236,13 @@ static Image *ReadMAPImage(const ImageInfo *image_info,ExceptionInfo *exception)
       p++;
       if (image->colors > 256)
         {
-          index=ConstrainColormapIndex(image,((size_t) index << 8)+(*p),
-            exception);
+          index=ConstrainColormapIndex(image,(ssize_t) (((size_t) index << 8)+
+            (size_t) (*p)),exception);
           p++;
         }
       SetPixelIndex(image,index,q);
       SetPixelViaPixelInfo(image,image->colormap+(ssize_t) index,q);
-      q+=GetPixelChannels(image);
+      q+=(ptrdiff_t) GetPixelChannels(image);
     }
     if (SyncAuthenticPixels(image,exception) == MagickFalse)
       break;
@@ -252,7 +251,10 @@ static Image *ReadMAPImage(const ImageInfo *image_info,ExceptionInfo *exception)
   if (y < (ssize_t) image->rows)
     ThrowFileException(exception,CorruptImageError,"UnexpectedEndOfFile",
       image->filename);
-  (void) CloseBlob(image);
+  if (CloseBlob(image) == MagickFalse)
+    status=MagickFalse;
+  if (status == MagickFalse)
+    return(DestroyImageList(image));
   return(GetFirstImageInList(image));
 }
 
@@ -450,11 +452,12 @@ static MagickBooleanType WriteMAPImage(const ImageInfo *image_info,Image *image,
       if (image->colors > 256)
         *q++=(unsigned char) ((size_t) GetPixelIndex(image,p) >> 8);
       *q++=(unsigned char) ((ssize_t) GetPixelIndex(image,p));
-      p+=GetPixelChannels(image);
+      p+=(ptrdiff_t) GetPixelChannels(image);
     }
     (void) WriteBlob(image,(size_t) (q-pixels),pixels);
   }
   pixels=(unsigned char *) RelinquishMagickMemory(pixels);
-  (void) CloseBlob(image);
+  if (CloseBlob(image) == MagickFalse)
+    status=MagickFalse;
   return(status);
 }

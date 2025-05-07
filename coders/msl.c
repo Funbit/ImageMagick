@@ -19,7 +19,7 @@
 %                               December 2001                                 %
 %                                                                             %
 %                                                                             %
-%  Copyright @ 2001 ImageMagick Studio LLC, a non-profit organization         %
+%  Copyright @ 1999 ImageMagick Studio LLC, a non-profit organization         %
 %  dedicated to making software imaging solutions freely available.           %
 %                                                                             %
 %  You may not use this file except in compliance with the License.  You may  %
@@ -93,25 +93,20 @@
 #include "MagickCore/utility.h"
 #include "MagickCore/visual-effects.h"
 #if defined(MAGICKCORE_XML_DELEGATE)
-#  if defined(MAGICKCORE_WINDOWS_SUPPORT)
-#    if !defined(__MINGW32__)
-#      include <win32config.h>
-#    endif
-#  endif
 #  include <libxml/xmlmemory.h>
 #  include <libxml/parserInternals.h>
 #  include <libxml/xmlerror.h>
 #endif
 
 /*
-  Define Declatations.
+  Define Declarations.
 */
 #define ThrowMSLException(severity,tag,reason) \
   (void) ThrowMagickException(msl_info->exception,GetMagickModule(),severity, \
     tag,"`%s'",reason);
 
 /*
-  Typedef declaractions.
+  Typedef declarations.
 */
 typedef struct _MSLGroupInfo
 {
@@ -143,14 +138,6 @@ typedef struct _MSLInfo
 
   MSLGroupInfo
     *group_info;
-
-#if defined(MAGICKCORE_XML_DELEGATE)
-  xmlParserCtxtPtr
-    parser;
-
-  xmlDocPtr
-    document;
-#endif
 } MSLInfo;
 
 /*
@@ -245,314 +232,6 @@ static int IsPathDirectory(const char *path)
   return(1);
 }
 
-static int MSLIsStandalone(void *context)
-{
-  MSLInfo
-    *msl_info;
-
-  /*
-    Is this document tagged standalone?
-  */
-  (void) LogMagickEvent(CoderEvent,GetMagickModule(),"  SAX.MSLIsStandalone()");
-  msl_info=(MSLInfo *) context;
-  return(msl_info->document->standalone == 1);
-}
-
-static int MSLHasInternalSubset(void *context)
-{
-  MSLInfo
-    *msl_info;
-
-  /*
-    Does this document has an internal subset?
-  */
-  (void) LogMagickEvent(CoderEvent,GetMagickModule(),
-    "  SAX.MSLHasInternalSubset()");
-  msl_info=(MSLInfo *) context;
-  return(msl_info->document->intSubset != NULL);
-}
-
-static int MSLHasExternalSubset(void *context)
-{
-  MSLInfo
-    *msl_info;
-
-  /*
-    Does this document has an external subset?
-  */
-  (void) LogMagickEvent(CoderEvent,GetMagickModule(),
-    "  SAX.MSLHasExternalSubset()");
-  msl_info=(MSLInfo *) context;
-  return(msl_info->document->extSubset != NULL);
-}
-
-static void MSLInternalSubset(void *context,const xmlChar *name,
-  const xmlChar *external_id,const xmlChar *system_id)
-{
-  MSLInfo
-    *msl_info;
-
-  /*
-    Does this document has an internal subset?
-  */
-  (void) LogMagickEvent(CoderEvent,GetMagickModule(),
-    "  SAX.internalSubset(%s %s %s)",name,
-    (external_id != (const xmlChar *) NULL ? (const char *) external_id : " "),
-    (system_id != (const xmlChar *) NULL ? (const char *) system_id : " "));
-  msl_info=(MSLInfo *) context;
-  (void) xmlCreateIntSubset(msl_info->document,name,external_id,system_id);
-}
-
-static xmlParserInputPtr MSLResolveEntity(void *context,
-  const xmlChar *public_id,const xmlChar *system_id)
-{
-  MSLInfo
-    *msl_info;
-
-  xmlParserInputPtr
-    stream;
-
-  /*
-    Special entity resolver, better left to the parser, it has more
-    context than the application layer.  The default behaviour is to
-    not resolve the entities, in that case the ENTITY_REF nodes are
-    built in the structure (and the parameter values).
-  */
-  (void) LogMagickEvent(CoderEvent,GetMagickModule(),
-    "  SAX.resolveEntity(%s, %s)",
-    (public_id != (const xmlChar *) NULL ? (const char *) public_id : "none"),
-    (system_id != (const xmlChar *) NULL ? (const char *) system_id : "none"));
-  msl_info=(MSLInfo *) context;
-  stream=xmlLoadExternalEntity((const char *) system_id,(const char *)
-    public_id,msl_info->parser);
-  return(stream);
-}
-
-static xmlEntityPtr MSLGetEntity(void *context,const xmlChar *name)
-{
-  MSLInfo
-    *msl_info;
-
-  /*
-    Get an entity by name.
-  */
-  (void) LogMagickEvent(CoderEvent,GetMagickModule(),
-    "  SAX.MSLGetEntity(%s)",(const char *) name);
-  msl_info=(MSLInfo *) context;
-  return(xmlGetDocEntity(msl_info->document,name));
-}
-
-static xmlEntityPtr MSLGetParameterEntity(void *context,const xmlChar *name)
-{
-  MSLInfo
-    *msl_info;
-
-  /*
-    Get a parameter entity by name.
-  */
-  (void) LogMagickEvent(CoderEvent,GetMagickModule(),
-    "  SAX.getParameterEntity(%s)",(const char *) name);
-  msl_info=(MSLInfo *) context;
-  return(xmlGetParameterEntity(msl_info->document,name));
-}
-
-static void MSLEntityDeclaration(void *context,const xmlChar *name,int type,
-  const xmlChar *public_id,const xmlChar *system_id,xmlChar *content)
-{
-  MSLInfo
-    *msl_info;
-
-  /*
-    An entity definition has been parsed.
-  */
-  (void) LogMagickEvent(CoderEvent,GetMagickModule(),
-    "  SAX.entityDecl(%s, %d, %s, %s, %s)",name,type,
-    public_id != (const xmlChar *) NULL ? (const char *) public_id : "none",
-    system_id != (const xmlChar *) NULL ? (const char *) system_id : "none",
-    content);
-  msl_info=(MSLInfo *) context;
-  if (msl_info->parser->inSubset == 1)
-    (void) xmlAddDocEntity(msl_info->document,name,type,public_id,system_id,
-      content);
-  else
-    if (msl_info->parser->inSubset == 2)
-      (void) xmlAddDtdEntity(msl_info->document,name,type,public_id,system_id,
-        content);
-}
-
-static void MSLAttributeDeclaration(void *context,const xmlChar *element,
-  const xmlChar *name,int type,int value,const xmlChar *default_value,
-  xmlEnumerationPtr tree)
-{
-  MSLInfo
-    *msl_info;
-
-  xmlChar
-    *fullname,
-    *prefix;
-
-  xmlParserCtxtPtr
-    parser;
-
-  /*
-    An attribute definition has been parsed.
-  */
-  (void) LogMagickEvent(CoderEvent,GetMagickModule(),
-    "  SAX.attributeDecl(%s, %s, %d, %d, %s, ...)\n",element,name,type,value,
-    default_value);
-  msl_info=(MSLInfo *) context;
-  fullname=(xmlChar *) NULL;
-  prefix=(xmlChar *) NULL;
-  parser=msl_info->parser;
-  fullname=(xmlChar *) xmlSplitQName(parser,name,&prefix);
-  if (parser->inSubset == 1)
-    (void) xmlAddAttributeDecl(&parser->vctxt,msl_info->document->intSubset,
-      element,fullname,prefix,(xmlAttributeType) type,
-      (xmlAttributeDefault) value,default_value,tree);
-  else
-    if (parser->inSubset == 2)
-      (void) xmlAddAttributeDecl(&parser->vctxt,msl_info->document->extSubset,
-        element,fullname,prefix,(xmlAttributeType) type,
-        (xmlAttributeDefault) value,default_value,tree);
-  if (prefix != (xmlChar *) NULL)
-    xmlFree(prefix);
-  if (fullname != (xmlChar *) NULL)
-    xmlFree(fullname);
-}
-
-static void MSLElementDeclaration(void *context,const xmlChar *name,int type,
-  xmlElementContentPtr content)
-{
-  MSLInfo
-    *msl_info;
-
-  xmlParserCtxtPtr
-    parser;
-
-  /*
-    An element definition has been parsed.
-  */
-  (void) LogMagickEvent(CoderEvent,GetMagickModule(),
-    "  SAX.elementDecl(%s, %d, ...)",name,type);
-  msl_info=(MSLInfo *) context;
-  parser=msl_info->parser;
-  if (parser->inSubset == 1)
-    (void) xmlAddElementDecl(&parser->vctxt,msl_info->document->intSubset,
-      name,(xmlElementTypeVal) type,content);
-  else
-    if (parser->inSubset == 2)
-      (void) xmlAddElementDecl(&parser->vctxt,msl_info->document->extSubset,
-        name,(xmlElementTypeVal) type,content);
-}
-
-static void MSLNotationDeclaration(void *context,const xmlChar *name,
-  const xmlChar *public_id,const xmlChar *system_id)
-{
-  MSLInfo
-    *msl_info;
-
-  xmlParserCtxtPtr
-    parser;
-
-  /*
-    What to do when a notation declaration has been parsed.
-  */
-  (void) LogMagickEvent(CoderEvent,GetMagickModule(),
-    "  SAX.notationDecl(%s, %s, %s)",name,
-    public_id != (const xmlChar *) NULL ? (const char *) public_id : "none",
-    system_id != (const xmlChar *) NULL ? (const char *) system_id : "none");
-  msl_info=(MSLInfo *) context;
-  parser=msl_info->parser;
-  if (parser->inSubset == 1)
-    (void) xmlAddNotationDecl(&parser->vctxt,msl_info->document->intSubset,
-      name,public_id,system_id);
-  else
-    if (parser->inSubset == 2)
-      (void) xmlAddNotationDecl(&parser->vctxt,msl_info->document->intSubset,
-        name,public_id,system_id);
-}
-
-static void MSLUnparsedEntityDeclaration(void *context,const xmlChar *name,
-  const xmlChar *public_id,const xmlChar *system_id,const xmlChar *notation)
-{
-  MSLInfo
-    *msl_info;
-
-  /*
-    What to do when an unparsed entity declaration is parsed.
-  */
-  (void) LogMagickEvent(CoderEvent,GetMagickModule(),
-    "  SAX.unparsedEntityDecl(%s, %s, %s, %s)",name,
-    public_id != (const xmlChar *) NULL ? (const char *) public_id : "none",
-    system_id != (const xmlChar *) NULL ? (const char *) system_id : "none",
-    notation);
-  msl_info=(MSLInfo *) context;
-  (void) xmlAddDocEntity(msl_info->document,name,
-    XML_EXTERNAL_GENERAL_UNPARSED_ENTITY,public_id,system_id,notation);
-
-}
-
-static void MSLSetDocumentLocator(void *context,xmlSAXLocatorPtr location)
-{
-  MSLInfo
-    *msl_info;
-
-  /*
-    Receive the document locator at startup, actually xmlDefaultSAXLocator.
-  */
-  (void) LogMagickEvent(CoderEvent,GetMagickModule(),
-    "  SAX.setDocumentLocator()\n");
-  (void) location;
-  msl_info=(MSLInfo *) context;
-  (void) msl_info;
-}
-
-static void MSLStartDocument(void *context)
-{
-  MSLInfo
-    *msl_info;
-
-  xmlParserCtxtPtr
-    parser;
-
-  /*
-    Called when the document start being processed.
-  */
-  (void) LogMagickEvent(CoderEvent,GetMagickModule(),
-    "  SAX.startDocument()");
-  msl_info=(MSLInfo *) context;
-  parser=msl_info->parser;
-  msl_info->document=xmlNewDoc(parser->version);
-  if (msl_info->document == (xmlDocPtr) NULL)
-    return;
-  if (parser->encoding == NULL)
-    msl_info->document->encoding=NULL;
-  else
-    msl_info->document->encoding=xmlStrdup(parser->encoding);
-  msl_info->document->standalone=parser->standalone;
-}
-
-static void MSLEndDocument(void *context)
-{
-  MSLInfo
-    *msl_info;
-
-  /*
-    Called when the document end has been detected.
-  */
-  (void) LogMagickEvent(CoderEvent,GetMagickModule(),"  SAX.endDocument()");
-  msl_info=(MSLInfo *) context;
-  if (msl_info->content != (char *) NULL)
-    msl_info->content=DestroyString(msl_info->content);
-#if defined(MAGICKCORE_XML_DELEGATE)
-  if (msl_info->document != (xmlDocPtr) NULL)
-    {
-      xmlFreeDoc(msl_info->document);
-      msl_info->document=(xmlDocPtr) NULL;
-    }
-#endif
-}
-
 static void MSLPushImage(MSLInfo *msl_info,Image *image)
 {
   ssize_t
@@ -564,13 +243,13 @@ static void MSLPushImage(MSLInfo *msl_info,Image *image)
   msl_info->n++;
   n=msl_info->n;
   msl_info->image_info=(ImageInfo **) ResizeQuantumMemory(msl_info->image_info,
-    (n+1),sizeof(*msl_info->image_info));
+    (size_t) (n+1),sizeof(*msl_info->image_info));
   msl_info->draw_info=(DrawInfo **) ResizeQuantumMemory(msl_info->draw_info,
-    (n+1),sizeof(*msl_info->draw_info));
+    (size_t) (n+1),sizeof(*msl_info->draw_info));
   msl_info->attributes=(Image **) ResizeQuantumMemory(msl_info->attributes,
-    (n+1),sizeof(*msl_info->attributes));
-  msl_info->image=(Image **) ResizeQuantumMemory(msl_info->image,(n+1),
-    sizeof(*msl_info->image));
+    (size_t) (n+1),sizeof(*msl_info->attributes));
+  msl_info->image=(Image **) ResizeQuantumMemory(msl_info->image,
+    (size_t) (n+1),sizeof(*msl_info->image));
   if ((msl_info->image_info == (ImageInfo **) NULL) ||
       (msl_info->draw_info == (DrawInfo **) NULL) ||
       (msl_info->attributes == (Image **) NULL) ||
@@ -640,15 +319,8 @@ static void MSLStartElement(void *context,const xmlChar *tag,
   Image
     *image;
 
-  int
+  MagickStatusType
     flags;
-
-  ssize_t
-    option,
-    j,
-    n,
-    x,
-    y;
 
   MSLInfo
     *msl_info;
@@ -657,11 +329,20 @@ static void MSLStartElement(void *context,const xmlChar *tag,
     geometry;
 
   ssize_t
-    i;
+    i,
+    j,
+    n,
+    option,
+    x,
+    y;
+
 
   size_t
     height,
     width;
+
+  xmlParserCtxtPtr
+    parser;
 
   /*
     Called when an opening tag has been processed.
@@ -669,7 +350,8 @@ static void MSLStartElement(void *context,const xmlChar *tag,
   (void) LogMagickEvent(CoderEvent,GetMagickModule(),
     "  SAX.startElement(%s",tag);
   exception=AcquireExceptionInfo();
-  msl_info=(MSLInfo *) context;
+  parser=(xmlParserCtxtPtr) context;
+  msl_info=(MSLInfo *) parser->_private;
   n=msl_info->n;
   keyword=(const char *) NULL;
   value=(char *) NULL;
@@ -983,7 +665,7 @@ static void MSLStartElement(void *context,const xmlChar *tag,
                     }
                   if (LocaleCompare(keyword,"strokewidth") == 0)
                     {
-                      draw_info->stroke_width=StringToLong(value);
+                      draw_info->stroke_width=(size_t) StringToLong(value);
                       break;
                     }
                   if (LocaleCompare(keyword,"style") == 0)
@@ -1039,7 +721,7 @@ static void MSLStartElement(void *context,const xmlChar *tag,
                 {
                   if (LocaleCompare(keyword,"weight") == 0)
                     {
-                      draw_info->weight=StringToLong(value);
+                      draw_info->weight=(size_t) StringToLong(value);
                       break;
                     }
                   ThrowMSLException(OptionError,"UnrecognizedAttribute",
@@ -1354,7 +1036,7 @@ static void MSLStartElement(void *context,const xmlChar *tag,
                 {
                   if (LocaleCompare(keyword,"height") == 0)
                     {
-                      geometry.height=StringToLong(value);
+                      geometry.height=(size_t) StringToLong(value);
                       break;
                     }
                   ThrowMSLException(OptionError,"UnrecognizedAttribute",
@@ -1366,7 +1048,7 @@ static void MSLStartElement(void *context,const xmlChar *tag,
                 {
                   if (LocaleCompare(keyword,"width") == 0)
                     {
-                      geometry.width=StringToLong(value);
+                      geometry.width=(size_t) StringToLong(value);
                       break;
                     }
                   ThrowMSLException(OptionError,"UnrecognizedAttribute",
@@ -1390,6 +1072,7 @@ static void MSLStartElement(void *context,const xmlChar *tag,
           break;
         }
       ThrowMSLException(OptionError,"UnrecognizedElement",(const char *) tag);
+      break;
     }
     case 'C':
     case 'c':
@@ -1585,7 +1268,7 @@ static void MSLStartElement(void *context,const xmlChar *tag,
                 {
                   if (LocaleCompare(keyword,"height") == 0)
                     {
-                      geometry.height=StringToLong(value);
+                      geometry.height=(size_t) StringToLong(value);
                       break;
                     }
                   ThrowMSLException(OptionError,"UnrecognizedAttribute",
@@ -1597,7 +1280,7 @@ static void MSLStartElement(void *context,const xmlChar *tag,
                 {
                   if (LocaleCompare(keyword,"width") == 0)
                     {
-                      geometry.width=StringToLong(value);
+                      geometry.width=(size_t) StringToLong(value);
                       break;
                     }
                   ThrowMSLException(OptionError,"UnrecognizedAttribute",
@@ -1989,13 +1672,13 @@ static void MSLStartElement(void *context,const xmlChar *tag,
                       for (r=0; r < (ssize_t) composite_image->rows ; r++)
                       {
                         q=GetCacheViewAuthenticPixels(composite_view,0,r,
-                          (ssize_t) composite_image->columns,1,exception);
+                          composite_image->columns,1,exception);
                         for (k=0; k < (ssize_t) composite_image->columns; k++)
                         {
                           if (GetPixelAlpha(composite_image,q) == OpaqueAlpha)
                             SetPixelAlpha(composite_image,
                               ClampToQuantum(opacity),q);
-                          q+=GetPixelChannels(composite_image);
+                          q+=(ptrdiff_t) GetPixelChannels(composite_image);
                         }
                         if (SyncCacheViewAuthenticPixels(composite_view,exception) == MagickFalse)
                           break;
@@ -2219,7 +1902,7 @@ static void MSLStartElement(void *context,const xmlChar *tag,
                 {
                   if (LocaleCompare(keyword,"height") == 0)
                     {
-                      geometry.height=StringToLong(value);
+                      geometry.height=(size_t) StringToLong(value);
                       break;
                     }
                   ThrowMSLException(OptionError,"UnrecognizedAttribute",
@@ -2231,7 +1914,7 @@ static void MSLStartElement(void *context,const xmlChar *tag,
                 {
                   if (LocaleCompare(keyword,"width") == 0)
                     {
-                      geometry.width=StringToLong(value);
+                      geometry.width=(size_t) StringToLong(value);
                       break;
                     }
                   ThrowMSLException(OptionError,"UnrecognizedAttribute",
@@ -2327,6 +2010,7 @@ static void MSLStartElement(void *context,const xmlChar *tag,
           break;
         }
       ThrowMSLException(OptionError,"UnrecognizedElement",(const char *) tag);
+      break;
     }
     case 'D':
     case 'd':
@@ -2379,15 +2063,7 @@ static void MSLStartElement(void *context,const xmlChar *tag,
                 msl_info->attributes[n],(const char *) attributes[i],exception);
               CloneString(&value,attribute);
               attribute=DestroyString(attribute);
-              switch (*keyword)
-              {
-                default:
-                {
-                  ThrowMSLException(OptionError,"UnrecognizedAttribute",
-                    keyword);
-                  break;
-                }
-              }
+              ThrowMSLException(OptionError,"UnrecognizedAttribute",keyword);
             }
           (void) DisplayImages(msl_info->image_info[n],msl_info->image[n],
             msl_info->exception);
@@ -2637,7 +2313,7 @@ static void MSLStartElement(void *context,const xmlChar *tag,
                     }
                   if (LocaleCompare(keyword,"strokewidth") == 0)
                     {
-                      draw_info->stroke_width=StringToLong(value);
+                      draw_info->stroke_width=(size_t) StringToLong(value);
                       break;
                     }
                   if (LocaleCompare(keyword,"style") == 0)
@@ -2695,7 +2371,7 @@ static void MSLStartElement(void *context,const xmlChar *tag,
                 {
                   if (LocaleCompare(keyword,"weight") == 0)
                     {
-                      draw_info->weight=StringToLong(value);
+                      draw_info->weight=(size_t) StringToLong(value);
                       break;
                     }
                   ThrowMSLException(OptionError,"UnrecognizedAttribute",
@@ -2751,6 +2427,7 @@ static void MSLStartElement(void *context,const xmlChar *tag,
           break;
         }
       ThrowMSLException(OptionError,"UnrecognizedElement",(const char *) tag);
+      break;
     }
     case 'E':
     case 'e':
@@ -2951,21 +2628,14 @@ static void MSLStartElement(void *context,const xmlChar *tag,
                 msl_info->attributes[n],(const char *) attributes[i],exception);
               CloneString(&value,attribute);
               attribute=DestroyString(attribute);
-              switch (*keyword)
-              {
-                default:
-                {
-                  ThrowMSLException(OptionError,"UnrecognizedAttribute",
-                    keyword);
-                  break;
-                }
-              }
+              ThrowMSLException(OptionError,"UnrecognizedAttribute",keyword);
             }
           (void) EqualizeImage(msl_info->image[n],
             msl_info->exception);
           break;
         }
       ThrowMSLException(OptionError,"UnrecognizedElement",(const char *) tag);
+      break;
     }
     case 'F':
     case 'f':
@@ -3142,7 +2812,7 @@ static void MSLStartElement(void *context,const xmlChar *tag,
                 {
                   if (LocaleCompare(keyword,"height") == 0)
                     {
-                      frame_info.height=StringToLong(value);
+                      frame_info.height=(size_t) StringToLong(value);
                       break;
                     }
                   ThrowMSLException(OptionError,"UnrecognizedAttribute",
@@ -3178,7 +2848,7 @@ static void MSLStartElement(void *context,const xmlChar *tag,
                 {
                   if (LocaleCompare(keyword,"width") == 0)
                     {
-                      frame_info.width=StringToLong(value);
+                      frame_info.width=(size_t) StringToLong(value);
                       break;
                     }
                   ThrowMSLException(OptionError,"UnrecognizedAttribute",
@@ -3195,8 +2865,10 @@ static void MSLStartElement(void *context,const xmlChar *tag,
             }
           frame_info.x=(ssize_t) frame_info.width;
           frame_info.y=(ssize_t) frame_info.height;
-          frame_info.width=msl_info->image[n]->columns+2*frame_info.x;
-          frame_info.height=msl_info->image[n]->rows+2*frame_info.y;
+          frame_info.width=(size_t) ((ssize_t) msl_info->image[n]->columns+2*
+            frame_info.x);
+          frame_info.height=(size_t) ((ssize_t) msl_info->image[n]->rows+2*
+            frame_info.y);
           frame_image=FrameImage(msl_info->image[n],&frame_info,
             msl_info->image[n]->compose,msl_info->exception);
           if (frame_image == (Image *) NULL)
@@ -3206,6 +2878,7 @@ static void MSLStartElement(void *context,const xmlChar *tag,
           break;
         }
       ThrowMSLException(OptionError,"UnrecognizedElement",(const char *) tag);
+      break;
     }
     case 'G':
     case 'g':
@@ -3343,6 +3016,7 @@ static void MSLStartElement(void *context,const xmlChar *tag,
                     break;
                   }
                 ThrowMSLException(OptionError,"UnrecognizedAttribute",keyword);
+                magick_fallthrough;
               }
               case 'W':
               case 'w':
@@ -3356,6 +3030,7 @@ static void MSLStartElement(void *context,const xmlChar *tag,
                     break;
                   }
                 ThrowMSLException(OptionError,"UnrecognizedAttribute",keyword);
+                magick_fallthrough;
               }
               default:
               {
@@ -3370,11 +3045,12 @@ static void MSLStartElement(void *context,const xmlChar *tag,
     {
       msl_info->number_groups++;
       msl_info->group_info=(MSLGroupInfo *) ResizeQuantumMemory(
-        msl_info->group_info,msl_info->number_groups+1UL,
+        msl_info->group_info,(size_t) (msl_info->number_groups+1),
         sizeof(*msl_info->group_info));
       break;
     }
       ThrowMSLException(OptionError,"UnrecognizedElement",(const char *) tag);
+      break;
     }
     case 'I':
     case 'i':
@@ -3507,6 +3183,7 @@ static void MSLStartElement(void *context,const xmlChar *tag,
           break;
         }
       ThrowMSLException(OptionError,"UnrecognizedElement",(const char *) tag);
+      break;
     }
     case 'L':
     case 'l':
@@ -3579,6 +3256,8 @@ static void MSLStartElement(void *context,const xmlChar *tag,
           msl_info->exception);
         break;
       }
+      ThrowMSLException(OptionError,"UnrecognizedElement",(const char *) tag);
+      break;
     }
     case 'M':
     case 'm':
@@ -4068,6 +3747,7 @@ static void MSLStartElement(void *context,const xmlChar *tag,
           break;
         }
       ThrowMSLException(OptionError,"UnrecognizedElement",(const char *) tag);
+      break;
     }
     case 'N':
     case 'n':
@@ -4194,6 +3874,7 @@ static void MSLStartElement(void *context,const xmlChar *tag,
           break;
         }
       ThrowMSLException(OptionError,"UnrecognizedElement",(const char *) tag);
+      break;
     }
     case 'O':
     case 'o':
@@ -4344,6 +4025,7 @@ static void MSLStartElement(void *context,const xmlChar *tag,
           break;
         }
       ThrowMSLException(OptionError,"UnrecognizedElement",(const char *) tag);
+      break;
     }
     case 'P':
     case 'p':
@@ -4484,6 +4166,7 @@ static void MSLStartElement(void *context,const xmlChar *tag,
             break;
           }
       ThrowMSLException(OptionError,"UnrecognizedElement",(const char *) tag);
+      break;
     }
     case 'Q':
     case 'q':
@@ -4518,7 +4201,7 @@ static void MSLStartElement(void *context,const xmlChar *tag,
                 {
                   if (LocaleCompare(keyword,"colors") == 0)
                     {
-                      quantize_info.number_colors=StringToLong(value);
+                      quantize_info.number_colors=(size_t) StringToLong(value);
                       break;
                     }
                   if (LocaleCompare(keyword,"colorspace") == 0)
@@ -4574,7 +4257,7 @@ static void MSLStartElement(void *context,const xmlChar *tag,
                 {
                   if (LocaleCompare(keyword,"treedepth") == 0)
                     {
-                      quantize_info.tree_depth=StringToLong(value);
+                      quantize_info.tree_depth=(size_t) StringToLong(value);
                       break;
                     }
                   ThrowMSLException(OptionError,"UnrecognizedAttribute",
@@ -4816,7 +4499,7 @@ static void MSLStartElement(void *context,const xmlChar *tag,
                     }
                   if (LocaleCompare(keyword,"strokewidth") == 0)
                     {
-                      draw_info->stroke_width=StringToLong(value);
+                      draw_info->stroke_width=(size_t) StringToLong(value);
                       break;
                     }
                   if (LocaleCompare(keyword,"style") == 0)
@@ -4872,7 +4555,7 @@ static void MSLStartElement(void *context,const xmlChar *tag,
                 {
                   if (LocaleCompare(keyword,"weight") == 0)
                     {
-                      draw_info->weight=StringToLong(value);
+                      draw_info->weight=(size_t) StringToLong(value);
                       break;
                     }
                   ThrowMSLException(OptionError,"UnrecognizedAttribute",
@@ -4962,6 +4645,7 @@ static void MSLStartElement(void *context,const xmlChar *tag,
           break;
         }
       ThrowMSLException(OptionError,"UnrecognizedElement",(const char *) tag);
+      break;
     }
     case 'R':
     case 'r':
@@ -5012,7 +4696,7 @@ static void MSLStartElement(void *context,const xmlChar *tag,
                 {
                   if (LocaleCompare(keyword,"height") == 0)
                     {
-                      geometry.height=StringToLong(value);
+                      geometry.height=(size_t) StringToLong(value);
                       break;
                     }
                   ThrowMSLException(OptionError,"UnrecognizedAttribute",
@@ -5041,7 +4725,7 @@ static void MSLStartElement(void *context,const xmlChar *tag,
                 {
                   if (LocaleCompare(keyword,"width") == 0)
                     {
-                      geometry.width=StringToLong(value);
+                      geometry.width=(size_t) StringToLong(value);
                       break;
                     }
                   ThrowMSLException(OptionError,"UnrecognizedAttribute",
@@ -5226,13 +4910,15 @@ static void MSLStartElement(void *context,const xmlChar *tag,
                   {
                     x=region.x;
                     if ((width == 0) && (region.x > 0))
-                      width=msl_info->image[n]->columns+region.x;
+                      width=(size_t) ((ssize_t) msl_info->image[n]->columns+
+                        region.x);
                   }
                 if ((flags & YValue) != 0)
                   {
                     y=region.y;
                     if ((height == 0) && (region.y > 0))
-                      height=msl_info->image[n]->rows+region.y;
+                      height=(size_t) ((ssize_t) msl_info->image[n]->rows+
+                        region.y);
                   }
               }
             break;
@@ -5245,8 +4931,8 @@ static void MSLStartElement(void *context,const xmlChar *tag,
           {
           if (LocaleCompare(keyword,"height") == 0)
             {
-            height = StringToLong( value );
-            break;
+              height=(size_t) StringToLong(value);
+              break;
             }
           ThrowMSLException(OptionError,"UnrecognizedAttribute",keyword);
           break;
@@ -5256,7 +4942,7 @@ static void MSLStartElement(void *context,const xmlChar *tag,
           {
           if (LocaleCompare(keyword,"width") == 0)
             {
-            width = StringToLong( value );
+            width=(size_t) StringToLong(value);
             break;
             }
           ThrowMSLException(OptionError,"UnrecognizedAttribute",keyword);
@@ -5458,7 +5144,7 @@ static void MSLStartElement(void *context,const xmlChar *tag,
                 {
                   if (LocaleCompare(keyword,"height") == 0)
                     {
-                      geometry.height=StringToUnsignedLong(value);
+                      geometry.height=(size_t) StringToUnsignedLong(value);
                       break;
                     }
                   ThrowMSLException(OptionError,"UnrecognizedAttribute",
@@ -5470,7 +5156,7 @@ static void MSLStartElement(void *context,const xmlChar *tag,
                 {
                   if (LocaleCompare(keyword,"width") == 0)
                     {
-                      geometry.width=StringToLong(value);
+                      geometry.width=(size_t) StringToLong(value);
                       break;
                     }
                   ThrowMSLException(OptionError,"UnrecognizedAttribute",
@@ -5779,6 +5465,7 @@ static void MSLStartElement(void *context,const xmlChar *tag,
         break;
       }
       ThrowMSLException(OptionError,"UnrecognizedElement",(const char *) tag);
+      break;
     }
     case 'S':
     case 's':
@@ -5825,7 +5512,7 @@ static void MSLStartElement(void *context,const xmlChar *tag,
                 {
                   if (LocaleCompare(keyword,"height") == 0)
                     {
-                      geometry.height=StringToUnsignedLong(value);
+                      geometry.height=(size_t) StringToUnsignedLong(value);
                       break;
                     }
                   ThrowMSLException(OptionError,"UnrecognizedAttribute",
@@ -5837,7 +5524,7 @@ static void MSLStartElement(void *context,const xmlChar *tag,
                 {
                   if (LocaleCompare(keyword,"width") == 0)
                     {
-                      geometry.width=StringToLong(value);
+                      geometry.width=(size_t) StringToLong(value);
                       break;
                     }
                   ThrowMSLException(OptionError,"UnrecognizedAttribute",
@@ -5902,7 +5589,7 @@ static void MSLStartElement(void *context,const xmlChar *tag,
                 {
                   if (LocaleCompare(keyword,"height") == 0)
                     {
-                      geometry.height=StringToUnsignedLong(value);
+                      geometry.height=(size_t) StringToUnsignedLong(value);
                       break;
                     }
                   ThrowMSLException(OptionError,"UnrecognizedAttribute",
@@ -5914,7 +5601,7 @@ static void MSLStartElement(void *context,const xmlChar *tag,
                 {
                   if (LocaleCompare(keyword,"width") == 0)
                     {
-                      geometry.width=StringToLong(value);
+                      geometry.width=(size_t) StringToLong(value);
                       break;
                     }
                   ThrowMSLException(OptionError,"UnrecognizedAttribute",
@@ -6135,7 +5822,7 @@ static void MSLStartElement(void *context,const xmlChar *tag,
 
                   if (value[len-1] == '%') {
                     char  tmp[100];
-                    (void) CopyMagickString(tmp,value,len);
+                    (void) CopyMagickString(tmp,value,(size_t) len);
                     opac = StringToLong( tmp );
                     opac = (int)(QuantumRange * ((float)opac/100));
                   } else
@@ -6503,7 +6190,7 @@ static void MSLStartElement(void *context,const xmlChar *tag,
           {
           if (LocaleCompare(keyword,"height") == 0)
             {
-            height = StringToLong( value );
+            height = (size_t) StringToLong( value );
             break;
             }
           ThrowMSLException(OptionError,"UnrecognizedAttribute",keyword);
@@ -6514,7 +6201,7 @@ static void MSLStartElement(void *context,const xmlChar *tag,
           {
           if (LocaleCompare(keyword,"width") == 0)
             {
-            width = StringToLong( value );
+            width = (size_t) StringToLong( value );
             break;
             }
           ThrowMSLException(OptionError,"UnrecognizedAttribute",keyword);
@@ -6664,15 +6351,7 @@ static void MSLStartElement(void *context,const xmlChar *tag,
                 msl_info->attributes[n],(const char *) attributes[i],exception);
               CloneString(&value,attribute);
               attribute=DestroyString(attribute);
-              switch (*keyword)
-              {
-                default:
-                {
-                  ThrowMSLException(OptionError,"UnrecognizedAttribute",
-                    keyword);
-                  break;
-                }
-              }
+              ThrowMSLException(OptionError,"UnrecognizedAttribute",keyword);
             }
           (void) SignatureImage(msl_info->image[n],exception);
           break;
@@ -6688,7 +6367,7 @@ static void MSLStartElement(void *context,const xmlChar *tag,
                 (const char *) tag);
               break;
             }
-          geometry_info.rho=QuantumRange/2.0;
+          geometry_info.rho=(double) QuantumRange/2.0;
           if (attributes != (const xmlChar **) NULL)
             for (i=0; (attributes[i] != (const xmlChar *) NULL); i++)
             {
@@ -7118,20 +6797,13 @@ static void MSLStartElement(void *context,const xmlChar *tag,
                 msl_info->attributes[n],(const char *) attributes[i],exception);
               CloneString(&value,attribute);
               attribute=DestroyString(attribute);
-              switch (*keyword)
-              {
-                default:
-                {
-                  ThrowMSLException(OptionError,"UnrecognizedAttribute",
-                    keyword);
-                  break;
-                }
-              }
+              ThrowMSLException(OptionError,"UnrecognizedAttribute",keyword);
             }
           (void) SyncImage(msl_info->image[n],exception);
           break;
         }
       ThrowMSLException(OptionError,"UnrecognizedElement",(const char *) tag);
+      break;
     }
     case 'T':
     case 't':
@@ -7316,6 +6988,7 @@ static void MSLStartElement(void *context,const xmlChar *tag,
         }
       }
       ThrowMSLException(OptionError,"UnrecognizedElement",(const char *) tag);
+      break;
     }
     case 'W':
     case 'w':
@@ -7349,6 +7022,7 @@ static void MSLStartElement(void *context,const xmlChar *tag,
                     break;
                   }
                 (void) SetMSLAttributes(msl_info,keyword,value);
+                magick_fallthrough;
               }
               default:
               {
@@ -7367,6 +7041,7 @@ static void MSLStartElement(void *context,const xmlChar *tag,
           }
         }
       ThrowMSLException(OptionError,"UnrecognizedElement",(const char *) tag);
+      break;
     }
     default:
     {
@@ -7388,12 +7063,16 @@ static void MSLEndElement(void *context,const xmlChar *tag)
   MSLInfo
     *msl_info;
 
+  xmlParserCtxtPtr
+    parser;
+
   /*
     Called when the end of an element has been detected.
   */
   (void) LogMagickEvent(CoderEvent,GetMagickModule(),"  SAX.endElement(%s)",
     tag);
-  msl_info=(MSLInfo *) context;
+  parser=(xmlParserCtxtPtr) context;
+  msl_info=(MSLInfo *) parser->_private;
   n=msl_info->n;
   switch (*tag)
   {
@@ -7486,6 +7165,9 @@ static void MSLCharacters(void *context,const xmlChar *c,int length)
   MSLInfo
     *msl_info;
 
+  xmlParserCtxtPtr
+    parser;
+
   char
     *p;
 
@@ -7497,17 +7179,18 @@ static void MSLCharacters(void *context,const xmlChar *c,int length)
   */
   (void) LogMagickEvent(CoderEvent,GetMagickModule(),
     "  SAX.characters(%s,%d)",c,length);
-  msl_info=(MSLInfo *) context;
+  parser=(xmlParserCtxtPtr) context;
+  msl_info=(MSLInfo *) parser->_private;
   if (msl_info->content != (char *) NULL)
     msl_info->content=(char *) ResizeQuantumMemory(msl_info->content,
-      strlen(msl_info->content)+length+MagickPathExtent,
+      strlen(msl_info->content)+(size_t) length+MagickPathExtent,
       sizeof(*msl_info->content));
   else
     {
       msl_info->content=(char *) NULL;
       if (~(size_t) length >= (MagickPathExtent-1))
-        msl_info->content=(char *) AcquireQuantumMemory(length+MagickPathExtent,
-          sizeof(*msl_info->content));
+        msl_info->content=(char *) AcquireQuantumMemory((size_t) (length+
+          MagickPathExtent),sizeof(*msl_info->content));
       if (msl_info->content != (char *) NULL)
         *msl_info->content='\0';
     }
@@ -7515,77 +7198,8 @@ static void MSLCharacters(void *context,const xmlChar *c,int length)
     return;
   p=msl_info->content+strlen(msl_info->content);
   for (i=0; i < length; i++)
-    *p++=c[i];
+    *p++=(char) c[i];
   *p='\0';
-}
-
-static void MSLReference(void *context,const xmlChar *name)
-{
-  MSLInfo
-    *msl_info;
-
-  xmlParserCtxtPtr
-    parser;
-
-  /*
-    Called when an entity reference is detected.
-  */
-  (void) LogMagickEvent(CoderEvent,GetMagickModule(),
-    "  SAX.reference(%s)",name);
-  msl_info=(MSLInfo *) context;
-  parser=msl_info->parser;
-  if (parser == (xmlParserCtxtPtr) NULL)
-    return;
-  if (parser->node == (xmlNodePtr) NULL)
-    return;
-  if (*name == '#')
-    (void) xmlAddChild(parser->node,xmlNewCharRef(msl_info->document,name));
-  else
-    (void) xmlAddChild(parser->node,xmlNewReference(msl_info->document,name));
-}
-
-static void MSLIgnorableWhitespace(void *context,const xmlChar *c,int length)
-{
-  MSLInfo
-    *msl_info;
-
-  /*
-    Receiving some ignorable whitespaces from the parser.
-  */
-  (void) LogMagickEvent(CoderEvent,GetMagickModule(),
-    "  SAX.ignorableWhitespace(%.30s, %d)",c,length);
-  msl_info=(MSLInfo *) context;
-  (void) msl_info;
-}
-
-static void MSLProcessingInstructions(void *context,const xmlChar *target,
-  const xmlChar *data)
-{
-  MSLInfo
-    *msl_info;
-
-  /*
-    A processing instruction has been parsed.
-  */
-  (void) LogMagickEvent(CoderEvent,GetMagickModule(),
-    "  SAX.processingInstruction(%s, %s)",
-    target,data);
-  msl_info=(MSLInfo *) context;
-  (void) msl_info;
-}
-
-static void MSLComment(void *context,const xmlChar *value)
-{
-  MSLInfo
-    *msl_info;
-
-  /*
-    A comment has been parsed.
-  */
-  (void) LogMagickEvent(CoderEvent,GetMagickModule(),
-    "  SAX.comment(%s)",value);
-  msl_info=(MSLInfo *) context;
-  (void) msl_info;
 }
 
 static void MSLWarning(void *context,const char *format,...)
@@ -7600,6 +7214,9 @@ static void MSLWarning(void *context,const char *format,...)
   MSLInfo
     *msl_info;
 
+  xmlParserCtxtPtr
+    parser;
+
   va_list
     operands;
 
@@ -7610,7 +7227,8 @@ static void MSLWarning(void *context,const char *format,...)
   va_start(operands,format);
   (void) LogMagickEvent(CoderEvent,GetMagickModule(),"  SAX.warning: ");
   (void) LogMagickEvent(CoderEvent,GetMagickModule(),format,operands);
-  msl_info=(MSLInfo *) context;
+  parser=(xmlParserCtxtPtr) context;
+  msl_info=(MSLInfo *) parser->_private;
   (void) msl_info;
 #if !defined(MAGICKCORE_HAVE_VSNPRINTF)
   (void) vsprintf(reason,format,operands);
@@ -7634,6 +7252,9 @@ static void MSLError(void *context,const char *format,...)
   MSLInfo
     *msl_info;
 
+  xmlParserCtxtPtr
+    parser;
+
   va_list
     operands;
 
@@ -7644,7 +7265,8 @@ static void MSLError(void *context,const char *format,...)
   va_start(operands,format);
   (void) LogMagickEvent(CoderEvent,GetMagickModule(),"  SAX.error: ");
   (void) LogMagickEvent(CoderEvent,GetMagickModule(),format,operands);
-  msl_info=(MSLInfo *) context;
+  parser=(xmlParserCtxtPtr) context;
+  msl_info=(MSLInfo *) parser->_private;
   (void) msl_info;
 #if !defined(MAGICKCORE_HAVE_VSNPRINTF)
   (void) vsprintf(reason,format,operands);
@@ -7653,104 +7275,7 @@ static void MSLError(void *context,const char *format,...)
 #endif
   ThrowMSLException(DelegateFatalError,reason,"SAX error");
   va_end(operands);
-  xmlStopParser(msl_info->parser);
-}
-
-static void MSLCDataBlock(void *context,const xmlChar *value,int length)
-{
-  MSLInfo
-    *msl_info;
-
-  xmlNodePtr
-    child;
-
-  xmlParserCtxtPtr
-    parser;
-
-  /*
-    Called when a pcdata block has been parsed.
-  */
-  (void) LogMagickEvent(CoderEvent,GetMagickModule(),
-    "  SAX.pcdata(%s, %d)",value,length);
-  msl_info=(MSLInfo *) context;
-  (void) msl_info;
-  parser=msl_info->parser;
-  child=xmlGetLastChild(parser->node);
-  if ((child != (xmlNodePtr) NULL) && (child->type == XML_CDATA_SECTION_NODE))
-    {
-      xmlTextConcat(child,value,length);
-      return;
-    }
-  child=xmlNewCDataBlock(parser->myDoc,value,length);
-  if (xmlAddChild(parser->node,child) == (xmlNodePtr) NULL)
-    xmlFreeNode(child);
-}
-
-static void MSLExternalSubset(void *context,const xmlChar *name,
-  const xmlChar *external_id,const xmlChar *system_id)
-{
-  MSLInfo
-    *msl_info;
-
-  xmlParserCtxt
-    parser_context;
-
-  xmlParserCtxtPtr
-    parser;
-
-  xmlParserInputPtr
-    input;
-
-  /*
-    Does this document has an external subset?
-  */
-  (void) LogMagickEvent(CoderEvent,GetMagickModule(),
-    "  SAX.externalSubset(%s %s %s)",name,
-    (external_id != (const xmlChar *) NULL ? (const char *) external_id : " "),
-    (system_id != (const xmlChar *) NULL ? (const char *) system_id : " "));
-  msl_info=(MSLInfo *) context;
-  (void) msl_info;
-  parser=msl_info->parser;
-  if (((external_id == NULL) && (system_id == NULL)) ||
-      ((parser->validate == 0) || (parser->wellFormed == 0) ||
-      (msl_info->document == 0)))
-    return;
-  input=MSLResolveEntity(context,external_id,system_id);
-  if (input == NULL)
-    return;
-  (void) xmlNewDtd(msl_info->document,name,external_id,system_id);
-  parser_context=(*parser);
-  parser->inputTab=(xmlParserInputPtr *) xmlMalloc(5*sizeof(*parser->inputTab));
-  if (parser->inputTab == (xmlParserInputPtr *) NULL)
-    {
-      parser->errNo=XML_ERR_NO_MEMORY;
-      parser->input=parser_context.input;
-      parser->inputNr=parser_context.inputNr;
-      parser->inputMax=parser_context.inputMax;
-      parser->inputTab=parser_context.inputTab;
-      return;
-  }
-  parser->inputNr=0;
-  parser->inputMax=5;
-  parser->input=NULL;
-  xmlPushInput(parser,input);
-  (void) xmlSwitchEncoding(parser,xmlDetectCharEncoding(parser->input->cur,4));
-  if (input->filename == (char *) NULL)
-    input->filename=(char *) xmlStrdup(system_id);
-  input->line=1;
-  input->col=1;
-  input->base=parser->input->cur;
-  input->cur=parser->input->cur;
-  input->free=NULL;
-  xmlParseExternalSubset(parser,external_id,system_id);
-  while (parser->inputNr > 1)
-    (void) xmlPopInput(parser);
-  xmlFreeInputStream(parser->input);
-  xmlFree(parser->inputTab);
-  parser->input=parser_context.input;
-  parser->inputNr=parser_context.inputNr;
-  parser->inputMax=parser_context.inputMax;
-  parser->inputTab=parser_context.inputTab;
+  xmlStopParser(parser);
 }
 
 #if defined(__cplusplus) || defined(c_plusplus)
@@ -7766,20 +7291,23 @@ static MagickBooleanType ProcessMSLScript(const ImageInfo *image_info,
   Image
     *msl_image;
 
-  int
+  MagickStatusType
     status;
-
-  ssize_t
-    n;
 
   MSLInfo
     msl_info;
+
+  ssize_t
+    n;
 
   xmlSAXHandler
     sax_modules;
 
   xmlSAXHandlerPtr
     sax_handler;
+
+  xmlParserCtxtPtr
+    parser;
 
   /*
     Open image file.
@@ -7832,62 +7360,58 @@ static MagickBooleanType ProcessMSLScript(const ImageInfo *image_info,
   if (*image != (Image *) NULL)
     MSLPushImage(&msl_info,*image);
   xmlInitParser();
-  (void) xmlSubstituteEntitiesDefault(1);
-  (void) memset(&sax_modules,0,sizeof(sax_modules));
-  sax_modules.internalSubset=MSLInternalSubset;
-  sax_modules.isStandalone=MSLIsStandalone;
-  sax_modules.hasInternalSubset=MSLHasInternalSubset;
-  sax_modules.hasExternalSubset=MSLHasExternalSubset;
-  sax_modules.resolveEntity=MSLResolveEntity;
-  sax_modules.getEntity=MSLGetEntity;
-  sax_modules.entityDecl=MSLEntityDeclaration;
-  sax_modules.notationDecl=MSLNotationDeclaration;
-  sax_modules.attributeDecl=MSLAttributeDeclaration;
-  sax_modules.elementDecl=MSLElementDeclaration;
-  sax_modules.unparsedEntityDecl=MSLUnparsedEntityDeclaration;
-  sax_modules.setDocumentLocator=MSLSetDocumentLocator;
-  sax_modules.startDocument=MSLStartDocument;
-  sax_modules.endDocument=MSLEndDocument;
+  /*
+    TODO: Upgrade to SAX version 2 (startElementNs/endElementNs)
+  */
+  xmlSAXVersion(&sax_modules,1);
   sax_modules.startElement=MSLStartElement;
   sax_modules.endElement=MSLEndElement;
-  sax_modules.reference=MSLReference;
+  sax_modules.reference=(referenceSAXFunc) NULL;
   sax_modules.characters=MSLCharacters;
-  sax_modules.ignorableWhitespace=MSLIgnorableWhitespace;
-  sax_modules.processingInstruction=MSLProcessingInstructions;
-  sax_modules.comment=MSLComment;
+  sax_modules.ignorableWhitespace=(ignorableWhitespaceSAXFunc) NULL;
+  sax_modules.processingInstruction=(processingInstructionSAXFunc) NULL;
+  sax_modules.comment=(commentSAXFunc) NULL;
   sax_modules.warning=MSLWarning;
   sax_modules.error=MSLError;
   sax_modules.fatalError=MSLError;
-  sax_modules.getParameterEntity=MSLGetParameterEntity;
-  sax_modules.cdataBlock=MSLCDataBlock;
-  sax_modules.externalSubset=MSLExternalSubset;
+  sax_modules.cdataBlock=MSLCharacters;
   sax_handler=(&sax_modules);
-  msl_info.parser=xmlCreatePushParserCtxt(sax_handler,&msl_info,(char *) NULL,0,
-    msl_image->filename);
+  parser=xmlCreatePushParserCtxt(sax_handler,(void *) NULL,(char *) NULL,
+    0,msl_image->filename);
+  if (parser != (xmlParserCtxtPtr) NULL)
+    {
+      const char *option;
+      parser->_private=(MSLInfo *) &msl_info;
+      option = GetImageOption(image_info,"msl:parse-huge");
+      if ((option != (char *) NULL) && (IsStringTrue(option) != MagickFalse))
+        (void) xmlCtxtUseOptions(parser,XML_PARSE_HUGE);
+      option=GetImageOption(image_info,"msl:substitute-entities");
+      if ((option != (char *) NULL) && (IsStringTrue(option) != MagickFalse))
+        (void) xmlCtxtUseOptions(parser,XML_PARSE_NOENT);
+    }
   while (ReadBlobString(msl_image,message) != (char *) NULL)
   {
     n=(ssize_t) strlen(message);
     if (n == 0)
       continue;
-    status=xmlParseChunk(msl_info.parser,message,(int) n,MagickFalse);
+    status=(MagickStatusType) xmlParseChunk(parser,message,(int) n,
+      MagickFalse);
     if (status != 0)
       break;
-    status=xmlParseChunk(msl_info.parser," ",1,MagickFalse);
+    status=(MagickStatusType) xmlParseChunk(parser," ",1,MagickFalse);
     if (status != 0)
       break;
     if (msl_info.exception->severity >= ErrorException)
       break;
   }
   if (msl_info.exception->severity == UndefinedException)
-    (void) xmlParseChunk(msl_info.parser," ",1,MagickTrue);
+    (void) xmlParseChunk(parser," ",1,MagickTrue);
   /*
     Free resources.
   */
-  MSLEndDocument(&msl_info);
-  if (msl_info.parser->myDoc != (xmlDocPtr) NULL)
-    xmlFreeDoc(msl_info.parser->myDoc);
-  xmlFreeParserCtxt(msl_info.parser);
-  xmlFreeDoc(msl_info.document);
+  if (parser->myDoc != (xmlDocPtr) NULL)
+    xmlFreeDoc(parser->myDoc);
+  xmlFreeParserCtxt(parser);
   (void) LogMagickEvent(CoderEvent,GetMagickModule(),"end SAX");
   if (*image == (Image *) NULL)
     *image=CloneImage(*msl_info.image,0,0,MagickTrue,exception);
@@ -7910,6 +7434,8 @@ static MagickBooleanType ProcessMSLScript(const ImageInfo *image_info,
     msl_info.image_info);
   msl_info.group_info=(MSLGroupInfo *) RelinquishMagickMemory(
     msl_info.group_info);
+  if (msl_info.content != (char *) NULL)
+    msl_info.content=DestroyString(msl_info.content);
   if (msl_info.exception->severity != UndefinedException)
     return(MagickFalse);
   return(MagickTrue);
@@ -8005,9 +7531,6 @@ ModuleExport size_t RegisterMSLImage(void)
 static MagickBooleanType SetMSLAttributes(MSLInfo *msl_info,const char *keyword,
   const char *value)
 {
-  Image
-    *attributes;
-
   DrawInfo
     *draw_info;
 
@@ -8018,12 +7541,13 @@ static MagickBooleanType SetMSLAttributes(MSLInfo *msl_info,const char *keyword,
     geometry_info;
 
   Image
+    *attributes,
     *image;
 
   ImageInfo
     *image_info;
 
-  int
+  MagickStatusType
     flags;
 
   ssize_t
@@ -8103,6 +7627,7 @@ static MagickBooleanType SetMSLAttributes(MSLInfo *msl_info,const char *keyword,
         }
       ThrowMSLException(OptionError,"UnrecognizedAttribute",keyword);
       break;
+      break;
     }
     case 'B':
     case 'b':
@@ -8132,6 +7657,7 @@ static MagickBooleanType SetMSLAttributes(MSLInfo *msl_info,const char *keyword,
           break;
         }
       ThrowMSLException(OptionError,"UnrecognizedAttribute",keyword);
+      break;
       break;
     }
     case 'D':
@@ -8226,10 +7752,10 @@ static MagickBooleanType SetMSLAttributes(MSLInfo *msl_info,const char *keyword,
     {
       if (LocaleCompare(keyword,"quality") == 0)
         {
-          image_info->quality=StringToLong(value);
+          image_info->quality=(size_t) StringToLong(value);
           if (image == (Image *) NULL)
             break;
-          image->quality=StringToLong(value);
+          image->quality=(size_t) StringToLong(value);
           break;
         }
       break;

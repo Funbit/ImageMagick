@@ -9,11 +9,11 @@
 #define MAGICKCORE_IMPLEMENTATION  1
 #define MAGICK_PLUSPLUS_IMPLEMENTATION 1
 
+#include "Magick++/SecurityPolicy.h"
+#include "Magick++/Exception.h"
 #include <string>
 #include <sstream>
 
-#include "Magick++/SecurityPolicy.h"
-#include "Magick++/Exception.h"
 
 using namespace std;
 
@@ -43,6 +43,15 @@ bool Magick::SecurityPolicy::maxMemoryRequest(const MagickSizeType limit_)
 
   value=toString(limit_);
   return(setValue(SystemPolicyDomain,"max-memory-request",value));
+}
+
+bool Magick::SecurityPolicy::maxProfileSize(const MagickSizeType limit_)
+{
+  string
+    value;
+
+  value=toString(limit_);
+  return(setValue(SystemPolicyDomain,"max-profile-size",value));
 }
 
 bool Magick::SecurityPolicy::shred(const int passes_)

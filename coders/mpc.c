@@ -17,7 +17,7 @@
 %                                 March 2000                                  %
 %                                                                             %
 %                                                                             %
-%  Copyright @ 2000 ImageMagick Studio LLC, a non-profit organization         %
+%  Copyright @ 1999 ImageMagick Studio LLC, a non-profit organization         %
 %  dedicated to making software imaging solutions freely available.           %
 %                                                                             %
 %  You may not use this file except in compliance with the License.  You may  %
@@ -64,7 +64,7 @@
 #include "MagickCore/monitor-private.h"
 #include "MagickCore/option.h"
 #include "MagickCore/pixel-private.h"
-#include "MagickCore/profile.h"
+#include "MagickCore/profile-private.h"
 #include "MagickCore/property.h"
 #include "MagickCore/quantum-private.h"
 #include "MagickCore/resource_.h"
@@ -177,16 +177,14 @@ static Image *ReadMPCImage(const ImageInfo *image_info,ExceptionInfo *exception)
   MagickStatusType
     flags;
 
-  ssize_t
-    i;
-
   size_t
     depth,
     extent,
     length;
 
   ssize_t
-    count;
+    count,
+    i;
 
   StringInfo
     *nonce;
@@ -307,7 +305,7 @@ static Image *ReadMPCImage(const ImageInfo *image_info,ExceptionInfo *exception)
                   Get the keyword value.
                 */
                 c=ReadBlobByte(image);
-                while ((c != (int) '}') && (c != EOF))
+                while ((c != (int) '{') && (c != (int) '}') && (c != EOF))
                 {
                   if ((size_t) (p-options+1) >= length)
                     {
@@ -324,7 +322,7 @@ static Image *ReadMPCImage(const ImageInfo *image_info,ExceptionInfo *exception)
                   if (c == '\\')
                     {
                       c=ReadBlobByte(image);
-                      if (c == (int) '}')
+                      if ((c == (int) '{') || (c == (int) '}'))
                         {
                           *p++=(char) c;
                           c=ReadBlobByte(image);
@@ -395,6 +393,12 @@ static Image *ReadMPCImage(const ImageInfo *image_info,ExceptionInfo *exception)
               case 'c':
               case 'C':
               {
+                if (LocaleCompare(keyword,"channel-mask") == 0)
+                  {
+                    image->channel_mask=(ChannelType)
+                      strtol(options,(char **) NULL,16);
+                    break;
+                  }
                 if (LocaleCompare(keyword,"class") == 0)
                   {
                     ssize_t
@@ -860,17 +864,23 @@ static Image *ReadMPCImage(const ImageInfo *image_info,ExceptionInfo *exception)
           length=ReadBlobMSBLong(image);
           if ((MagickSizeType) length > GetBlobSize(image))
             break;
-          profile=AcquireStringInfo(length);
+          profile=AcquireProfileStringInfo(name,length,exception);
           if (profile == (StringInfo *) NULL)
-            break;
-          count=ReadBlob(image,length,GetStringInfoDatum(profile));
-          if (count != (ssize_t) length)
             {
-              profile=DestroyStringInfo(profile);
-              break;
+              count=SeekBlob(image,(MagickOffsetType) length,SEEK_CUR);
+              if (count != (ssize_t) length)
+                break;
             }
-          status=SetImageProfile(image,name,profile,exception);
-          profile=DestroyStringInfo(profile);
+          else
+            {
+              count=ReadBlob(image,length,GetStringInfoDatum(profile));
+              if (count != (ssize_t) length)
+                {
+                  profile=DestroyStringInfo(profile);
+                  break;
+                }
+              status=SetImageProfilePrivate(image,profile,exception);
+            }
           if (status == MagickFalse)
             break;
           name=(const char *) GetNextValueInLinkedList(profiles);
@@ -1029,7 +1039,8 @@ static Image *ReadMPCImage(const ImageInfo *image_info,ExceptionInfo *exception)
           break;
       }
   } while ((c != EOF) && ((c == 'i') || (c == 'I')));
-  (void) CloseBlob(image);
+  if (CloseBlob(image) == MagickFalse)
+    status=MagickFalse;
   if (status == MagickFalse)
     return(DestroyImageList(image));
   return(GetFirstImageInList(image));
@@ -1145,12 +1156,12 @@ static MagickBooleanType WriteMPCImage(const ImageInfo *image_info,Image *image,
     offset,
     scene;
 
-  ssize_t
-    i;
-
   size_t
     depth,
-    imageListLength;
+    number_scenes;
+
+  ssize_t
+    i;
 
   /*
     Open persistent cache.
@@ -1170,7 +1181,7 @@ static MagickBooleanType WriteMPCImage(const ImageInfo *image_info,Image *image,
   AppendImageFormat("cache",cache_filename);
   scene=0;
   offset=0;
-  imageListLength=GetImageListLength(image);
+  number_scenes=GetImageListLength(image);
   do
   {
     StringInfo
@@ -1193,17 +1204,18 @@ static MagickBooleanType WriteMPCImage(const ImageInfo *image_info,Image *image,
     nonce=DestroyStringInfo(nonce);
     (void) WriteBlobString(image,buffer);
     (void) FormatLocaleString(buffer,MagickPathExtent,
-      "class=%s  colors=%.20g  alpha-trait=%s\n",CommandOptionToMnemonic(
+      "class=%s colors=%.20g alpha-trait=%s\n",CommandOptionToMnemonic(
       MagickClassOptions,image->storage_class),(double) image->colors,
       CommandOptionToMnemonic(MagickPixelTraitOptions,(ssize_t)
       image->alpha_trait));
     (void) WriteBlobString(image,buffer);
-    (void) FormatLocaleString(buffer,MagickPathExtent,
-      "number-channels=%.20g  number-meta-channels=%.20g\n",
-      (double) image->number_channels,(double) image->number_meta_channels);
+    (void) FormatLocaleString(buffer,MagickPathExtent,"number-channels=%.20g "
+      "number-meta-channels=%.20g channel-mask=0x%016llx\n",
+      (double) image->number_channels,(double) image->number_meta_channels,
+      (MagickOffsetType) image->channel_mask);
     (void) WriteBlobString(image,buffer);
     (void) FormatLocaleString(buffer,MagickPathExtent,
-      "columns=%.20g  rows=%.20g depth=%.20g\n",(double) image->columns,
+      "columns=%.20g rows=%.20g depth=%.20g\n",(double) image->columns,
       (double) image->rows,(double) image->depth);
     (void) WriteBlobString(image,buffer);
     if (image->type != UndefinedType)
@@ -1231,7 +1243,7 @@ static MagickBooleanType WriteMPCImage(const ImageInfo *image_info,Image *image,
     if (image->compression != UndefinedCompression)
       {
         (void) FormatLocaleString(buffer,MagickPathExtent,
-          "compression=%s  quality=%.20g\n",CommandOptionToMnemonic(
+          "compression=%s quality=%.20g\n",CommandOptionToMnemonic(
           MagickCompressOptions,image->compression),(double) image->quality);
         (void) WriteBlobString(image,buffer);
       }
@@ -1273,12 +1285,12 @@ static MagickBooleanType WriteMPCImage(const ImageInfo *image_info,Image *image,
       {
         if (image->scene == 0)
           (void) FormatLocaleString(buffer,MagickPathExtent,
-            "iterations=%.20g  delay=%.20g  ticks-per-second=%.20g\n",(double)
+            "iterations=%.20g delay=%.20g  ticks-per-second=%.20g\n",(double)
             image->iterations,(double) image->delay,(double)
             image->ticks_per_second);
         else
           (void) FormatLocaleString(buffer,MagickPathExtent,"scene=%.20g  "
-            "iterations=%.20g  delay=%.20g  ticks-per-second=%.20g\n",
+            "iterations=%.20g delay=%.20g  ticks-per-second=%.20g\n",
             (double) image->scene,(double) image->iterations,(double)
             image->delay,(double) image->ticks_per_second);
         (void) WriteBlobString(image,buffer);
@@ -1338,10 +1350,10 @@ static MagickBooleanType WriteMPCImage(const ImageInfo *image_info,Image *image,
     if (image->chromaticity.white_point.x != 0.0)
       {
         /*
-          Note chomaticity points.
+          Note chromaticity points.
         */
-        (void) FormatLocaleString(buffer,MagickPathExtent,"red-primary="
-          "%g,%g  green-primary=%g,%g  blue-primary=%g,%g\n",
+        (void) FormatLocaleString(buffer,MagickPathExtent,"red-primary=%g,%g "
+          "green-primary=%g,%g blue-primary=%g,%g\n",
           image->chromaticity.red_primary.x,image->chromaticity.red_primary.y,
           image->chromaticity.green_primary.x,
           image->chromaticity.green_primary.y,
@@ -1411,12 +1423,13 @@ static MagickBooleanType WriteMPCImage(const ImageInfo *image_info,Image *image,
           else
             {
               (void) WriteBlobByte(image,'{');
-              if (strchr(value,'}') == (char *) NULL)
+              if ((strchr(value,'{') == (char *) NULL) &&
+                  (strchr(value,'}') == (char *) NULL))
                 (void) WriteBlob(image,length,(const unsigned char *) value);
               else
                 for (i=0; i < (ssize_t) length; i++)
                 {
-                  if (value[i] == (int) '}')
+                  if ((value[i] == (int) '{') || (value[i] == (int) '}'))
                     (void) WriteBlobByte(image,'\\');
                   (void) WriteBlobByte(image,(unsigned char) value[i]);
                 }
@@ -1553,12 +1566,13 @@ static MagickBooleanType WriteMPCImage(const ImageInfo *image_info,Image *image,
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
         status=image->progress_monitor(SaveImagesTag,scene,
-          imageListLength,image->client_data);
+          number_scenes,image->client_data);
         if (status == MagickFalse)
           break;
       }
     scene++;
   } while (image_info->adjoin != MagickFalse);
-  (void) CloseBlob(image);
+  if (CloseBlob(image) == MagickFalse)
+    status=MagickFalse;
   return(status);
 }
